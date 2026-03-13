@@ -428,7 +428,8 @@ let currentOctave = 4;
 function initAudio() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    // Resume immediately — this function is always called from a user gesture
+    audioCtx.resume();
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 0.75;
     analyser = audioCtx.createAnalyser();
@@ -452,7 +453,7 @@ function initAudio() {
     delayFeedback = audioCtx.createGain();
     delayFeedback.gain.value = 0;
     delayWet = audioCtx.createGain();
-    delayWet.gain.value = 0; // Off by default — no signal through delay when delay=0
+    delayWet.gain.value = 0;
     masterGain.connect(dryGain);
     masterGain.connect(reverbGain);
     reverbGain.connect(convolver);
@@ -465,6 +466,17 @@ function initAudio() {
     delayWet.connect(analyser);
     analyser.connect(audioCtx.destination);
 }
+
+// Eagerly init audio on the very first user interaction (any touch/click).
+// This ensures the AudioContext is created and resumed within the browser's
+// user-gesture window, so it's already running by the time a pad is pressed.
+function earlyAudioInit() {
+    initAudio();
+    document.removeEventListener('touchstart', earlyAudioInit, true);
+    document.removeEventListener('mousedown', earlyAudioInit, true);
+}
+document.addEventListener('touchstart', earlyAudioInit, true);
+document.addEventListener('mousedown', earlyAudioInit, true);
 
 // --- Presets (same as desktop) ---
 const PRESETS = {
@@ -752,16 +764,9 @@ class PhysicalVoice {
 
 function playNote(midi, vel) {
     initAudio();
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume().then(() => {
-            createVoice(midi, vel);
-        });
-    } else {
-        createVoice(midi, vel);
-    }
-}
-
-function createVoice(midi, vel) {
+    // Context was already resumed by earlyAudioInit on first touch,
+    // but handle edge case where pad is the very first interaction
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
     activeVoices.set(midi, new PhysicalVoice(midiToFreq(midi), vel || 0.8));
 }

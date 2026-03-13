@@ -618,6 +618,16 @@ function initAudio() {
     analyser.connect(audioCtx.destination);
 }
 
+// Eagerly init audio on the very first user interaction so the
+// AudioContext is created and resumed within the gesture window.
+function earlyAudioInit() {
+    initAudio();
+    document.removeEventListener('mousedown', earlyAudioInit, true);
+    document.removeEventListener('touchstart', earlyAudioInit, true);
+}
+document.addEventListener('mousedown', earlyAudioInit, true);
+document.addEventListener('touchstart', earlyAudioInit, true);
+
 function createReverbIR() {
     const rate = audioCtx.sampleRate;
     const length = rate * 2.5;
@@ -1319,14 +1329,7 @@ function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
 function playNote(midiNote, velocity) {
     initAudio();
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume().then(() => createVoice(midiNote, velocity));
-    } else {
-        createVoice(midiNote, velocity);
-    }
-}
-
-function createVoice(midiNote, velocity) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     if (!polyMode) {
         activeVoices.forEach((v, k) => { v.release(); activeVoices.delete(k); });
     }
