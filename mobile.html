@@ -358,8 +358,7 @@
         <div class="header">
             <div class="logo">Physical Modelling</div>
             <div class="header-btns">
-                <button class="hdr-btn" id="btnSustain">SUS</button>
-                <button class="hdr-btn" onclick="location.href='index.html'">&larr;</button>
+                <button class="hdr-btn" id="btnSustain">Sustain</button>
             </div>
         </div>
 
@@ -753,7 +752,16 @@ class PhysicalVoice {
 
 function playNote(midi, vel) {
     initAudio();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+            createVoice(midi, vel);
+        });
+    } else {
+        createVoice(midi, vel);
+    }
+}
+
+function createVoice(midi, vel) {
     if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
     activeVoices.set(midi, new PhysicalVoice(midiToFreq(midi), vel || 0.8));
 }

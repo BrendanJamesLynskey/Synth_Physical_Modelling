@@ -1319,9 +1319,15 @@ function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
 function playNote(midiNote, velocity) {
     initAudio();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => createVoice(midiNote, velocity));
+    } else {
+        createVoice(midiNote, velocity);
+    }
+}
+
+function createVoice(midiNote, velocity) {
     if (!polyMode) {
-        // Stop all current voices
         activeVoices.forEach((v, k) => { v.release(); activeVoices.delete(k); });
     }
     if (activeVoices.has(midiNote)) {
