@@ -156,7 +156,7 @@
             position:relative;
             background:#080604;
             border-bottom:1px solid var(--panel-border);
-            min-height:200px;
+            min-height:120px;
         }
         #visCanvas {
             width:100%;
@@ -358,6 +358,72 @@
             padding:12px;
             margin-top:8px;
         }
+
+        /* Algorithm Info Panel */
+        .algo-panel {
+            background:rgba(0,0,0,0.6);
+            border-top:1px solid var(--panel-border);
+            border-bottom:1px solid var(--panel-border);
+            overflow-y:auto;
+            max-height:220px;
+            min-height:140px;
+            padding:10px 14px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.68rem;
+            line-height:1.6;
+            color:var(--text-dim);
+        }
+        .algo-panel::-webkit-scrollbar { width:3px; }
+        .algo-panel::-webkit-scrollbar-thumb { background:var(--accent-5); border-radius:2px; }
+        .algo-header {
+            font-size:0.6rem;
+            color:var(--accent-3);
+            text-transform:uppercase;
+            letter-spacing:0.15em;
+            margin-bottom:6px;
+            padding-bottom:4px;
+            border-bottom:1px solid rgba(212,135,14,0.08);
+        }
+        .algo-section { margin-bottom:8px; }
+        .algo-label {
+            color:var(--accent-4);
+            font-size:0.6rem;
+            text-transform:uppercase;
+            letter-spacing:0.1em;
+            margin-bottom:2px;
+        }
+        .algo-eq {
+            color:var(--accent-3);
+            font-size:0.72rem;
+            margin:2px 0;
+        }
+        .algo-partials {
+            display:flex;
+            flex-wrap:wrap;
+            gap:3px;
+            margin:3px 0;
+        }
+        .algo-partial {
+            background:rgba(212,135,14,0.08);
+            border:1px solid rgba(212,135,14,0.12);
+            border-radius:3px;
+            padding:1px 5px;
+            font-size:0.62rem;
+            color:var(--accent-3);
+        }
+        .algo-partial .freq { color:var(--text); }
+        .algo-partial .amp { color:var(--text-dim); font-size:0.58rem; }
+        .algo-flow {
+            color:var(--text-muted);
+            font-size:0.62rem;
+            margin:4px 0;
+            padding:4px 6px;
+            background:rgba(212,135,14,0.03);
+            border-radius:4px;
+            border:1px solid rgba(212,135,14,0.06);
+        }
+        .algo-flow .node { color:var(--accent-3); }
+        .algo-flow .arrow { color:var(--accent-1); margin:0 3px; }
     </style>
 </head>
 <body>
@@ -385,6 +451,12 @@
                 <canvas id="visCanvas"></canvas>
                 <div class="vis-label">Waveform &middot; Vibration Modes</div>
                 <div class="vis-model-label" id="visModelLabel">String</div>
+            </div>
+            <div class="algo-panel" id="algoPanel">
+                <div class="algo-header">Algorithm Details</div>
+                <div id="algoContent">
+                    <span style="color:var(--text-muted)">Play a note to see the physical model in action...</span>
+                </div>
             </div>
             <div class="keyboard-area">
                 <div class="keyboard" id="keyboard"></div>
@@ -701,6 +773,10 @@ function updateEffects() {
 function updateModelLabel() {
     const labels = { string:'String', tube:'Tube', membrane:'Membrane', bar:'Bar', modal:'Modal' };
     document.getElementById('visModelLabel').textContent = (labels[currentModel] || 'String') + ' · ' + currentExcite;
+    // Update algo display with a reference pitch if no note active
+    if (activeVoices.size === 0) {
+        updateAlgoInfo(261.63, 60); // C4
+    }
 }
 
 // --- Wire up controls ---
@@ -901,15 +977,6 @@ class PhysicalVoice {
                 noiseSrc.start(now);
                 this.nodes.push(noiseSrc);
             }
-
-            // Body resonance filter
-            const body = this.createBodyFilter(freq, bodySize);
-            // Reconnect output through body
-            const bodyGain = audioCtx.createGain();
-            bodyGain.gain.value = bodySize * 0.3;
-            this.output.connect(bodyGain);
-            bodyGain.connect(body);
-            body.connect(masterGain);
 
             this.output.gain.setValueAtTime(1.0, now);
             this.output.gain.exponentialRampToValueAtTime(0.0001, now + decayTime);
@@ -1254,8 +1321,10 @@ function playNote(midiNote, velocity) {
         activeVoices.get(midiNote).release();
         activeVoices.delete(midiNote);
     }
-    const voice = new PhysicalVoice(midiToFreq(midiNote), velocity || 0.8);
+    const freq = midiToFreq(midiNote);
+    const voice = new PhysicalVoice(freq, velocity || 0.8);
     activeVoices.set(midiNote, voice);
+    updateAlgoInfo(freq, midiNote);
 }
 
 function stopNote(midiNote) {
@@ -1348,6 +1417,198 @@ document.addEventListener('keyup', (e) => {
         if (el) el.classList.remove('pressed');
     }
 });
+
+// --- Algorithm Info Display ---
+function updateAlgoInfo(freq, midiNote) {
+    const panel = document.getElementById('algoContent');
+    const noteNames = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+    const noteName = noteNames[midiNote % 12] + (Math.floor(midiNote / 12) - 1);
+
+    let html = '';
+
+    // Model description & equation
+    const modelInfo = getModelInfo();
+    html += `<div class="algo-section">`;
+    html += `<div class="algo-label">Model: ${modelInfo.name}</div>`;
+    html += `<div class="algo-eq">${modelInfo.equation}</div>`;
+    html += `<div style="color:var(--text-dim);font-size:0.62rem">${modelInfo.description}</div>`;
+    html += `</div>`;
+
+    // Excitation
+    const exciteInfo = getExciteInfo();
+    html += `<div class="algo-section">`;
+    html += `<div class="algo-label">Excitation: ${currentExcite}</div>`;
+    html += `<div style="color:var(--text-dim);font-size:0.62rem">${exciteInfo}</div>`;
+    html += `</div>`;
+
+    // Partials generated
+    const partials = computePartials(freq);
+    html += `<div class="algo-section">`;
+    html += `<div class="algo-label">Partials Generated (${noteName} = ${freq.toFixed(1)} Hz)</div>`;
+    html += `<div class="algo-partials">`;
+    for (const p of partials) {
+        html += `<span class="algo-partial"><span class="freq">${p.freq.toFixed(1)}</span> <span class="amp">${p.ratio} &times; ${p.amp.toFixed(3)}</span></span>`;
+    }
+    html += `</div></div>`;
+
+    // Signal flow
+    html += `<div class="algo-section">`;
+    html += `<div class="algo-label">Signal Flow</div>`;
+    html += `<div class="algo-flow">`;
+    html += getSignalFlow();
+    html += `</div></div>`;
+
+    // Key parameters
+    html += `<div class="algo-section">`;
+    html += `<div class="algo-label">Active Parameters</div>`;
+    html += `<div style="font-size:0.62rem;color:var(--text-dim)">`;
+    html += `Damping: ${params.damping.toFixed(2)} · Brightness: ${params.brightness.toFixed(2)} · `;
+    html += `Stiffness: ${params.stiffness.toFixed(2)} · Decay: ${(params.decay * 4 + 0.5).toFixed(1)}s · `;
+    html += `Pickup: ${params.pickup.toFixed(2)} · Sympathetic: ${params.sympathetic.toFixed(2)}`;
+    html += `</div></div>`;
+
+    panel.innerHTML = html;
+}
+
+function getModelInfo() {
+    switch (currentModel) {
+        case 'string': return {
+            name: 'Karplus-Strong String',
+            equation: 'y(n) = &frac12;[y(n-N) + y(n-N-1)] &middot; damping<sup>n</sup>',
+            description: 'Delay line of length N = fs/f0 with averaging filter. Harmonics at integer multiples of f0, with inharmonicity B&middot;n&sup2; from stiffness. Pickup position filters harmonics where sin(&pi;&middot;n&middot;pos) &approx; 0.'
+        };
+        case 'tube': return {
+            name: 'Waveguide Tube/Pipe',
+            equation: 'p(x,t) = p<sup>+</sup>(t - x/c) + p<sup>-</sup>(t + x/c)',
+            description: params.brightness > 0.5
+                ? 'Open pipe: all harmonics present (f, 2f, 3f...). Standing waves from two travelling waves with open boundary conditions at both ends.'
+                : 'Closed pipe: odd harmonics only (f, 3f, 5f...). Pressure node at open end, antinode at closed end creates half-wave resonances.'
+        };
+        case 'membrane': return {
+            name: 'Circular Membrane (Bessel Modes)',
+            equation: 'f<sub>mn</sub> = &alpha;<sub>mn</sub> &middot; f<sub>0</sub> where &alpha; = zeros of J<sub>m</sub>',
+            description: 'Modes of a vibrating circular membrane follow Bessel function zeros. Ratios: 1.000, 1.593, 2.136, 2.296, 2.653... — fundamentally inharmonic, giving the characteristic "drum" timbre.'
+        };
+        case 'bar': return {
+            name: 'Euler-Bernoulli Beam',
+            equation: 'f<sub>n</sub> = f<sub>1</sub> &middot; n&sup2; &middot; &pi;/(2L&sup2;) &middot; &radic;(EI/&rho;A)',
+            description: 'Bar partials follow a squared relationship (1, 2.76, 5.40, 8.93, 13.34...) due to bending stiffness. Unlike strings, higher modes are progressively sharper than harmonic, creating metallic brightness.'
+        };
+        case 'modal': return {
+            name: 'Modal Resonance Synthesis',
+            equation: 'y(t) = &Sigma; A<sub>k</sub> &middot; sin(2&pi;f<sub>k</sub>t) &middot; e<sup>-d<sub>k</sub>t</sup>',
+            description: 'Each resonant mode k has its own frequency, amplitude, and decay rate. Bell-like partials (1, 2, 3, 4.2, 5.4, 6.8...) with stiffness shifting higher modes progressively via &Delta;f = B&middot;k&sup2;.'
+        };
+        default: return { name: 'Unknown', equation: '', description: '' };
+    }
+}
+
+function getExciteInfo() {
+    switch (currentExcite) {
+        case 'pluck': return 'Short broadband noise burst (15ms) filtered to match fundamental. Simulates finger/plectrum releasing string — initial energy across all modes, then natural decay.';
+        case 'strike': return 'Very short impulse (8ms) with odd harmonic emphasis. Simulates hammer or mallet impact — energy injection biased toward odd partials, rapid spectral evolution.';
+        case 'bow': return 'Continuous sawtooth excitation with LFO vibrato (4-6 Hz). Stick-slip friction model: bow velocity modulates harmonic content via lowpass filter cutoff.';
+        case 'blow': return 'Sustained harmonic series with breathy noise component. Air jet excitation with breath pressure variation (3-6 Hz LFO). Higher modes enter progressively during attack.';
+        case 'noise': return 'Extended noise burst (50ms) with bandpass filtering. Broad excitation spectrum for non-pitched or noise-driven timbres.';
+        case 'impulse': return 'Single-sample Dirac-like impulse. Theoretically excites all modes equally — reveals the pure resonant character of the model.';
+        default: return '';
+    }
+}
+
+function computePartials(freq) {
+    const partials = [];
+    const dm = params.damping, br = params.brightness, st = params.stiffness, pk = params.pickup;
+
+    switch (currentModel) {
+        case 'string': {
+            const nh = Math.min(Math.floor(6 + br * 14), 20);
+            for (let h = 1; h <= nh; h++) {
+                const inharmonic = 1 + st * 0.0005 * h * h;
+                const actualFreq = freq * h * inharmonic;
+                if (actualFreq > 18000) break;
+                const pickupFactor = Math.sin(Math.PI * h * pk);
+                const dampFactor = Math.exp(-h * dm * 0.15);
+                const amp = (0.12 / h) * dampFactor * Math.abs(pickupFactor);
+                partials.push({ freq: actualFreq, ratio: h + '×f₀' + (st > 0.01 ? '×' + inharmonic.toFixed(4) : ''), amp });
+            }
+            break;
+        }
+        case 'tube': {
+            const open = br > 0.5;
+            const nh = Math.floor(4 + br * 12);
+            for (let h = 1; h <= nh; h++) {
+                const hn = open ? h : (h * 2 - 1);
+                const hf = freq * hn; if (hf > 16000) break;
+                const amp = 0.15 / hn * Math.exp(-hn * dm * 0.08);
+                partials.push({ freq: hf, ratio: hn + '×f₀', amp });
+            }
+            break;
+        }
+        case 'membrane': {
+            const mr = [1.000, 1.593, 2.136, 2.296, 2.653, 2.917, 3.156, 3.501, 3.600, 3.652];
+            for (let i = 0; i < mr.length; i++) {
+                const mf = freq * mr[i] * (1 + st * 0.01 * i); if (mf > 16000) break;
+                const amp = 0.1 * Math.exp(-i * (0.2 + dm * 0.3)) * (0.5 + br * 0.5);
+                partials.push({ freq: mf, ratio: mr[i].toFixed(3) + '×f₀', amp });
+            }
+            break;
+        }
+        case 'bar': {
+            const br2 = [1.000, 2.758, 5.406, 8.934, 13.345, 18.636];
+            for (let i = 0; i < br2.length; i++) {
+                const pf = freq * br2[i] * (1 + st * 0.005 * i); if (pf > 18000) break;
+                const amp = 0.12 * Math.exp(-i * (0.15 + dm * 0.25));
+                partials.push({ freq: pf, ratio: br2[i].toFixed(3) + '×f₀', amp });
+            }
+            break;
+        }
+        case 'modal': {
+            const mr = [1.0, 2.0, 3.0, 4.2, 5.4, 6.8, 8.1, 9.7, 11.5, 13.2, 15.1, 17.3];
+            for (let i = 0; i < mr.length; i++) {
+                const shift = 1 + st * 0.003 * i * i;
+                const pf = freq * mr[i] * shift; if (pf > 18000) break;
+                const amp = 0.08 * Math.exp(-i * (0.1 + dm * 0.2)) * (0.3 + br * 0.7);
+                partials.push({ freq: pf, ratio: (mr[i] * shift).toFixed(2) + '×f₀', amp });
+            }
+            break;
+        }
+    }
+    return partials;
+}
+
+function getSignalFlow() {
+    const a = '<span class="arrow">&rarr;</span>';
+    const n = (s) => `<span class="node">${s}</span>`;
+
+    let excNode = '';
+    switch (currentExcite) {
+        case 'pluck': excNode = n('Noise Burst (15ms)') + ' + '; break;
+        case 'strike': excNode = n('Impulse (8ms)') + ' + '; break;
+        case 'bow': excNode = n('Sawtooth + LFO Vibrato') + a + n('Lowpass Filter') + a; break;
+        case 'blow': excNode = n('Harmonic Series + Breath Noise') + a; break;
+        case 'noise': excNode = n('Noise (50ms)') + ' + '; break;
+        case 'impulse': excNode = n('Dirac Impulse') + ' + '; break;
+    }
+
+    let modelNode = '';
+    switch (currentModel) {
+        case 'string': modelNode = n(`Harmonics (×${Math.min(Math.floor(6 + params.brightness * 14), 20)})`) + a + n('Pickup Filter'); break;
+        case 'tube': modelNode = n(`${params.brightness > 0.5 ? 'Open' : 'Closed'} Pipe Modes`); break;
+        case 'membrane': modelNode = n('Bessel Modes (×10)'); break;
+        case 'bar': modelNode = n('Beam Partials (×6)'); break;
+        case 'modal': modelNode = n('Modal Resonances (×12)'); break;
+    }
+
+    let chain = excNode + modelNode;
+    if (params.sympathetic > 0.05) chain += ' + ' + n('Sympathetic Strings');
+    chain += a + n('Output Gain');
+    chain += a + n('Master');
+    if (params.reverb > 0.01) chain += a + n(`Reverb (${params.reverb.toFixed(2)})`);
+    if (params.delay > 0.01) chain += ' + ' + n(`Delay (${params.delay.toFixed(2)})`);
+    chain += a + n('Analyser') + a + n('Speakers');
+
+    return chain;
+}
 
 // --- Visualisation ---
 function initVis() {
