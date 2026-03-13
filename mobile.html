@@ -351,9 +351,54 @@
             padding:10px;
             text-decoration:none;
         }
+
+        /* Tap-to-start overlay */
+        .start-overlay {
+            position:fixed;
+            inset:0;
+            z-index:100;
+            background:rgba(10,8,6,0.95);
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            gap:16px;
+            cursor:pointer;
+            -webkit-tap-highlight-color:transparent;
+        }
+        .start-overlay.hidden { display:none; }
+        .start-icon {
+            width:64px;
+            height:64px;
+            border:2px solid var(--accent-1);
+            border-radius:50%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            animation:pulse-ring 2s ease-in-out infinite;
+        }
+        .start-icon svg { width:28px; height:28px; fill:var(--accent-3); margin-left:4px; }
+        .start-text {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.85rem;
+            color:var(--text-dim);
+            letter-spacing:0.12em;
+            text-transform:uppercase;
+        }
+        @keyframes pulse-ring {
+            0%,100% { box-shadow:0 0 0 0 rgba(212,135,14,0.3); }
+            50% { box-shadow:0 0 0 14px rgba(212,135,14,0); }
+        }
     </style>
 </head>
 <body>
+    <div class="start-overlay" id="startOverlay">
+        <div class="start-icon">
+            <svg viewBox="0 0 24 24"><polygon points="8,5 19,12 8,19"/></svg>
+        </div>
+        <div class="start-text">Tap to start</div>
+    </div>
+
     <div class="app">
         <div class="header">
             <div class="logo">Physical Modelling</div>
@@ -466,15 +511,21 @@ delayNode.connect(delayWet);
 delayWet.connect(analyser);
 analyser.connect(audioCtx.destination);
 
-// On first user gesture, just resume — everything else is already set up.
+// Resume audio via the tap-to-start overlay.
+// This guarantees the context is running before any pad is touched.
 function resumeAudio() {
     if (!audioResumed) {
         audioCtx.resume();
         audioResumed = true;
     }
 }
-document.addEventListener('touchstart', resumeAudio, { once: true, capture: true });
-document.addEventListener('mousedown', resumeAudio, { once: true, capture: true });
+const startOverlay = document.getElementById('startOverlay');
+function dismissOverlay() {
+    resumeAudio();
+    startOverlay.classList.add('hidden');
+}
+startOverlay.addEventListener('touchstart', (e) => { e.preventDefault(); dismissOverlay(); }, { passive: false });
+startOverlay.addEventListener('mousedown', (e) => { e.preventDefault(); dismissOverlay(); });
 
 // --- Presets (same as desktop) ---
 const PRESETS = {
