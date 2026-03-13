@@ -515,14 +515,16 @@ analyser.connect(audioCtx.destination);
 // This guarantees the context is running before any pad is touched.
 function resumeAudio() {
     if (!audioResumed) {
-        audioCtx.resume();
         audioResumed = true;
+        return audioCtx.resume();
     }
+    return Promise.resolve();
 }
 const startOverlay = document.getElementById('startOverlay');
 function dismissOverlay() {
-    resumeAudio();
-    startOverlay.classList.add('hidden');
+    resumeAudio().then(() => {
+        startOverlay.classList.add('hidden');
+    });
 }
 startOverlay.addEventListener('touchstart', (e) => { e.preventDefault(); dismissOverlay(); }, { passive: false });
 startOverlay.addEventListener('mousedown', (e) => { e.preventDefault(); dismissOverlay(); });
@@ -812,7 +814,13 @@ class PhysicalVoice {
 }
 
 function playNote(midi, vel) {
-    resumeAudio();
+    if (audioCtx.state !== 'running') {
+        resumeAudio().then(() => {
+            if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
+            activeVoices.set(midi, new PhysicalVoice(midiToFreq(midi), vel || 0.8));
+        });
+        return;
+    }
     if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
     activeVoices.set(midi, new PhysicalVoice(midiToFreq(midi), vel || 0.8));
 }
