@@ -560,75 +560,29 @@
 // ============================================================
 
 // --- Audio Context ---
-let audioCtx = null;
-let masterGain, reverbGain, dryGain, chorusGain, delayNode, delayFeedback, delayWet, convolver;
-let analyser, analyserData;
+// Create AudioContext and full audio graph at page load (starts suspended).
+// All nodes are ready; only resume() is needed on first user gesture.
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const activeVoices = new Map();
 let sustainActive = false;
 let polyMode = true;
 let sustainedNotes = new Set();
+let audioResumed = false;
 
-function initAudio() {
-    if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+const masterGain = audioCtx.createGain();
+masterGain.gain.value = 0.75;
 
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.75;
+const analyser = audioCtx.createAnalyser();
+analyser.fftSize = 2048;
+const analyserData = new Float32Array(analyser.fftSize);
 
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyserData = new Float32Array(analyser.fftSize);
+const reverbGain = audioCtx.createGain();
+reverbGain.gain.value = 0.3;
+const dryGain = audioCtx.createGain();
+dryGain.gain.value = 0.7;
 
-    // Reverb chain
-    reverbGain = audioCtx.createGain();
-    reverbGain.gain.value = 0.3;
-    dryGain = audioCtx.createGain();
-    dryGain.gain.value = 0.7;
-
-    convolver = audioCtx.createConvolver();
-    createReverbIR();
-
-    // Chorus (simple detune oscillator delay)
-    chorusGain = audioCtx.createGain();
-    chorusGain.gain.value = 0;
-
-    // Delay with wet gate (silent when delay=0)
-    delayNode = audioCtx.createDelay(2.0);
-    delayNode.delayTime.value = 0.3;
-    delayFeedback = audioCtx.createGain();
-    delayFeedback.gain.value = 0;
-    delayWet = audioCtx.createGain();
-    delayWet.gain.value = 0; // Off by default
-
-    // Routing: masterGain splits to dry + reverb only
-    masterGain.connect(dryGain);
-    masterGain.connect(reverbGain);
-    reverbGain.connect(convolver);
-    convolver.connect(analyser);
-    dryGain.connect(analyser);
-
-    // Delay routing: gated by delayWet so no signal passes when delay=0
-    masterGain.connect(delayNode);
-    delayNode.connect(delayFeedback);
-    delayFeedback.connect(delayNode);
-    delayNode.connect(delayWet);
-    delayWet.connect(analyser);
-
-    analyser.connect(audioCtx.destination);
-}
-
-// Eagerly init audio on the very first user interaction so the
-// AudioContext is created and resumed within the gesture window.
-function earlyAudioInit() {
-    initAudio();
-    document.removeEventListener('mousedown', earlyAudioInit, true);
-    document.removeEventListener('touchstart', earlyAudioInit, true);
-}
-document.addEventListener('mousedown', earlyAudioInit, true);
-document.addEventListener('touchstart', earlyAudioInit, true);
-
-function createReverbIR() {
+const convolver = audioCtx.createConvolver();
+(function createReverbIR() {
     const rate = audioCtx.sampleRate;
     const length = rate * 2.5;
     const ir = audioCtx.createBuffer(2, length, rate);
@@ -639,7 +593,40 @@ function createReverbIR() {
         }
     }
     convolver.buffer = ir;
+})();
+
+const chorusGain = audioCtx.createGain();
+chorusGain.gain.value = 0;
+
+const delayNode = audioCtx.createDelay(2.0);
+delayNode.delayTime.value = 0.3;
+const delayFeedback = audioCtx.createGain();
+delayFeedback.gain.value = 0;
+const delayWet = audioCtx.createGain();
+delayWet.gain.value = 0;
+
+// Routing
+masterGain.connect(dryGain);
+masterGain.connect(reverbGain);
+reverbGain.connect(convolver);
+convolver.connect(analyser);
+dryGain.connect(analyser);
+masterGain.connect(delayNode);
+delayNode.connect(delayFeedback);
+delayFeedback.connect(delayNode);
+delayNode.connect(delayWet);
+delayWet.connect(analyser);
+analyser.connect(audioCtx.destination);
+
+// On first user gesture, just resume — everything else is already set up.
+function resumeAudio() {
+    if (!audioResumed) {
+        audioCtx.resume();
+        audioResumed = true;
+    }
 }
+document.addEventListener('mousedown', resumeAudio, { once: true, capture: true });
+document.addEventListener('touchstart', resumeAudio, { once: true, capture: true });
 
 // --- Presets ---
 const PRESETS = {
@@ -1328,8 +1315,7 @@ class PhysicalVoice {
 function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
 function playNote(midiNote, velocity) {
-    initAudio();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    resumeAudio();
     if (!polyMode) {
         activeVoices.forEach((v, k) => { v.release(); activeVoices.delete(k); });
     }

@@ -419,27 +419,26 @@
 // PHYSICAL MODELLING SYNTHESISER — Mobile
 // ============================================================
 
-let audioCtx = null;
-let masterGain, reverbGain, dryGain, convolver, delayNode, delayFeedback, delayWet, analyser, analyserData;
 const activeVoices = new Map();
 let sustainActive = false;
 let currentOctave = 4;
+let audioResumed = false;
 
-function initAudio() {
-    if (audioCtx) return;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    // Resume immediately — this function is always called from a user gesture
-    audioCtx.resume();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.75;
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    analyserData = new Float32Array(analyser.fftSize);
-    reverbGain = audioCtx.createGain();
-    reverbGain.gain.value = 0.3;
-    dryGain = audioCtx.createGain();
-    dryGain.gain.value = 0.7;
-    convolver = audioCtx.createConvolver();
+// Create AudioContext and full audio graph at page load.
+// It starts suspended (no user gesture yet) — that's fine.
+// All nodes are ready; only resume() is needed on first touch.
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const masterGain = audioCtx.createGain();
+masterGain.gain.value = 0.75;
+const analyser = audioCtx.createAnalyser();
+analyser.fftSize = 2048;
+const analyserData = new Float32Array(analyser.fftSize);
+const reverbGain = audioCtx.createGain();
+reverbGain.gain.value = 0.3;
+const dryGain = audioCtx.createGain();
+dryGain.gain.value = 0.7;
+const convolver = audioCtx.createConvolver();
+(function createReverbIR() {
     const rate = audioCtx.sampleRate;
     const len = rate * 2.5;
     const ir = audioCtx.createBuffer(2, len, rate);
@@ -448,35 +447,34 @@ function initAudio() {
         for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (rate * 0.8));
     }
     convolver.buffer = ir;
-    delayNode = audioCtx.createDelay(2.0);
-    delayNode.delayTime.value = 0.3;
-    delayFeedback = audioCtx.createGain();
-    delayFeedback.gain.value = 0;
-    delayWet = audioCtx.createGain();
-    delayWet.gain.value = 0;
-    masterGain.connect(dryGain);
-    masterGain.connect(reverbGain);
-    reverbGain.connect(convolver);
-    convolver.connect(analyser);
-    dryGain.connect(analyser);
-    masterGain.connect(delayNode);
-    delayNode.connect(delayFeedback);
-    delayFeedback.connect(delayNode);
-    delayNode.connect(delayWet);
-    delayWet.connect(analyser);
-    analyser.connect(audioCtx.destination);
-}
+})();
+const delayNode = audioCtx.createDelay(2.0);
+delayNode.delayTime.value = 0.3;
+const delayFeedback = audioCtx.createGain();
+delayFeedback.gain.value = 0;
+const delayWet = audioCtx.createGain();
+delayWet.gain.value = 0;
+masterGain.connect(dryGain);
+masterGain.connect(reverbGain);
+reverbGain.connect(convolver);
+convolver.connect(analyser);
+dryGain.connect(analyser);
+masterGain.connect(delayNode);
+delayNode.connect(delayFeedback);
+delayFeedback.connect(delayNode);
+delayNode.connect(delayWet);
+delayWet.connect(analyser);
+analyser.connect(audioCtx.destination);
 
-// Eagerly init audio on the very first user interaction (any touch/click).
-// This ensures the AudioContext is created and resumed within the browser's
-// user-gesture window, so it's already running by the time a pad is pressed.
-function earlyAudioInit() {
-    initAudio();
-    document.removeEventListener('touchstart', earlyAudioInit, true);
-    document.removeEventListener('mousedown', earlyAudioInit, true);
+// On first user gesture, just resume — everything else is already set up.
+function resumeAudio() {
+    if (!audioResumed) {
+        audioCtx.resume();
+        audioResumed = true;
+    }
 }
-document.addEventListener('touchstart', earlyAudioInit, true);
-document.addEventListener('mousedown', earlyAudioInit, true);
+document.addEventListener('touchstart', resumeAudio, { once: true, capture: true });
+document.addEventListener('mousedown', resumeAudio, { once: true, capture: true });
 
 // --- Presets (same as desktop) ---
 const PRESETS = {
@@ -763,10 +761,7 @@ class PhysicalVoice {
 }
 
 function playNote(midi, vel) {
-    initAudio();
-    // Context was already resumed by earlyAudioInit on first touch,
-    // but handle edge case where pad is the very first interaction
-    if (audioCtx.state === 'suspended') audioCtx.resume();
+    resumeAudio();
     if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
     activeVoices.set(midi, new PhysicalVoice(midiToFreq(midi), vel || 0.8));
 }
