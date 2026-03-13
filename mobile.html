@@ -421,7 +421,7 @@
 // ============================================================
 
 let audioCtx = null;
-let masterGain, reverbGain, dryGain, convolver, delayNode, delayFeedback, analyser, analyserData;
+let masterGain, reverbGain, dryGain, convolver, delayNode, delayFeedback, delayWet, analyser, analyserData;
 const activeVoices = new Map();
 let sustainActive = false;
 let currentOctave = 4;
@@ -429,6 +429,7 @@ let currentOctave = 4;
 function initAudio() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 0.75;
     analyser = audioCtx.createAnalyser();
@@ -451,6 +452,8 @@ function initAudio() {
     delayNode.delayTime.value = 0.3;
     delayFeedback = audioCtx.createGain();
     delayFeedback.gain.value = 0;
+    delayWet = audioCtx.createGain();
+    delayWet.gain.value = 0; // Off by default — no signal through delay when delay=0
     masterGain.connect(dryGain);
     masterGain.connect(reverbGain);
     reverbGain.connect(convolver);
@@ -459,7 +462,8 @@ function initAudio() {
     masterGain.connect(delayNode);
     delayNode.connect(delayFeedback);
     delayFeedback.connect(delayNode);
-    delayNode.connect(analyser);
+    delayNode.connect(delayWet);
+    delayWet.connect(analyser);
     analyser.connect(audioCtx.destination);
 }
 
@@ -525,10 +529,12 @@ let params = {
 
 function updateEffects() {
     if (!audioCtx) return;
-    reverbGain.gain.setTargetAtTime(params.reverb, audioCtx.currentTime, 0.05);
-    dryGain.gain.setTargetAtTime(1 - params.reverb * 0.5, audioCtx.currentTime, 0.05);
-    delayFeedback.gain.setTargetAtTime(params.delay * 0.6, audioCtx.currentTime, 0.05);
-    masterGain.gain.setTargetAtTime(params.volume, audioCtx.currentTime, 0.05);
+    const t = audioCtx.currentTime;
+    reverbGain.gain.setTargetAtTime(params.reverb, t, 0.05);
+    dryGain.gain.setTargetAtTime(1 - params.reverb * 0.5, t, 0.05);
+    delayWet.gain.setTargetAtTime(params.delay, t, 0.05);
+    delayFeedback.gain.setTargetAtTime(params.delay > 0.01 ? params.delay * 0.5 : 0, t, 0.05);
+    masterGain.gain.setTargetAtTime(params.volume, t, 0.05);
 }
 
 function updateModelLabel() {
@@ -747,6 +753,7 @@ class PhysicalVoice {
 
 function playNote(midi, vel) {
     initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
     activeVoices.set(midi, new PhysicalVoice(midiToFreq(midi), vel || 0.8));
 }

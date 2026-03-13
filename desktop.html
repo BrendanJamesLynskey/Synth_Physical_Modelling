@@ -561,7 +561,7 @@
 
 // --- Audio Context ---
 let audioCtx = null;
-let masterGain, reverbGain, dryGain, chorusGain, delayNode, delayFeedback, convolver;
+let masterGain, reverbGain, dryGain, chorusGain, delayNode, delayFeedback, delayWet, convolver;
 let analyser, analyserData;
 const activeVoices = new Map();
 let sustainActive = false;
@@ -571,6 +571,7 @@ let sustainedNotes = new Set();
 function initAudio() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 
     masterGain = audioCtx.createGain();
     masterGain.gain.value = 0.75;
@@ -592,24 +593,27 @@ function initAudio() {
     chorusGain = audioCtx.createGain();
     chorusGain.gain.value = 0;
 
-    // Delay
+    // Delay with wet gate (silent when delay=0)
     delayNode = audioCtx.createDelay(2.0);
     delayNode.delayTime.value = 0.3;
     delayFeedback = audioCtx.createGain();
     delayFeedback.gain.value = 0;
+    delayWet = audioCtx.createGain();
+    delayWet.gain.value = 0; // Off by default
 
-    // Routing
+    // Routing: masterGain splits to dry + reverb only
     masterGain.connect(dryGain);
     masterGain.connect(reverbGain);
     reverbGain.connect(convolver);
     convolver.connect(analyser);
     dryGain.connect(analyser);
 
-    // Delay routing
+    // Delay routing: gated by delayWet so no signal passes when delay=0
     masterGain.connect(delayNode);
     delayNode.connect(delayFeedback);
     delayFeedback.connect(delayNode);
-    delayNode.connect(analyser);
+    delayNode.connect(delayWet);
+    delayWet.connect(analyser);
 
     analyser.connect(audioCtx.destination);
 }
@@ -764,10 +768,12 @@ function setSlider(name, val) {
 
 function updateEffects() {
     if (!audioCtx) return;
-    reverbGain.gain.setTargetAtTime(params.reverb, audioCtx.currentTime, 0.05);
-    dryGain.gain.setTargetAtTime(1 - params.reverb * 0.5, audioCtx.currentTime, 0.05);
-    delayFeedback.gain.setTargetAtTime(params.delay * 0.6, audioCtx.currentTime, 0.05);
-    masterGain.gain.setTargetAtTime(params.volume, audioCtx.currentTime, 0.05);
+    const t = audioCtx.currentTime;
+    reverbGain.gain.setTargetAtTime(params.reverb, t, 0.05);
+    dryGain.gain.setTargetAtTime(1 - params.reverb * 0.5, t, 0.05);
+    delayWet.gain.setTargetAtTime(params.delay, t, 0.05);
+    delayFeedback.gain.setTargetAtTime(params.delay > 0.01 ? params.delay * 0.5 : 0, t, 0.05);
+    masterGain.gain.setTargetAtTime(params.volume, t, 0.05);
 }
 
 function updateModelLabel() {
@@ -1313,6 +1319,7 @@ function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
 
 function playNote(midiNote, velocity) {
     initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
     if (!polyMode) {
         // Stop all current voices
         activeVoices.forEach((v, k) => { v.release(); activeVoices.delete(k); });
