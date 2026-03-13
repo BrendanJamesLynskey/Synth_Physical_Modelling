@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physical Modelling Synth — Desktop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0806;
+            --panel: #111010;
+            --panel-border: rgba(212,135,14,0.1);
+            --accent-1: #d4870e;
+            --accent-2: #b8621b;
+            --accent-3: #e8a849;
+            --accent-4: #c9955a;
+            --accent-5: #8b6914;
+            --text: #e8e0d4;
+            --text-dim: rgba(255,245,230,0.45);
+            --text-muted: rgba(255,245,230,0.25);
+            --glow-1: rgba(212,135,14,0.3);
+            --glow-2: rgba(184,98,27,0.2);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:'Inter',sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            min-height:100vh;
+            overflow-x:hidden;
+            user-select:none;
+        }
+
+        /* Header */
+        .header {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:12px 20px;
+            border-bottom:1px solid var(--panel-border);
+            background:var(--panel);
+        }
+        .header-left {
+            display:flex;
+            align-items:center;
+            gap:12px;
+        }
+        .logo {
+            font-size:1.1rem;
+            font-weight:700;
+            background:linear-gradient(135deg,var(--accent-3),var(--accent-1));
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            background-clip:text;
+        }
+        .logo-sub {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.65rem;
+            color:var(--text-muted);
+            letter-spacing:0.15em;
+            text-transform:uppercase;
+        }
+
+        /* Transport */
+        .transport {
+            display:flex;
+            align-items:center;
+            gap:8px;
+        }
+        .transport button {
+            background:rgba(212,135,14,0.08);
+            border:1px solid var(--panel-border);
+            color:var(--text);
+            padding:6px 14px;
+            border-radius:6px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.75rem;
+            cursor:pointer;
+            transition:all 0.2s;
+            letter-spacing:0.05em;
+        }
+        .transport button:hover {
+            background:rgba(212,135,14,0.15);
+            border-color:var(--accent-1);
+        }
+        .transport button.active {
+            background:var(--accent-1);
+            color:#000;
+            border-color:var(--accent-1);
+        }
+
+        /* Main Layout */
+        .main {
+            display:grid;
+            grid-template-columns:220px 1fr 260px;
+            grid-template-rows:1fr;
+            height:calc(100vh - 49px);
+        }
+
+        /* Left Panel — Presets */
+        .preset-panel {
+            background:var(--panel);
+            border-right:1px solid var(--panel-border);
+            overflow-y:auto;
+            padding:12px;
+        }
+        .preset-panel::-webkit-scrollbar { width:4px; }
+        .preset-panel::-webkit-scrollbar-thumb { background:var(--accent-5); border-radius:2px; }
+        .preset-category {
+            margin-bottom:16px;
+        }
+        .preset-cat-title {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.65rem;
+            color:var(--accent-3);
+            text-transform:uppercase;
+            letter-spacing:0.15em;
+            margin-bottom:8px;
+            padding-bottom:4px;
+            border-bottom:1px solid rgba(212,135,14,0.08);
+        }
+        .preset-btn {
+            display:block;
+            width:100%;
+            text-align:left;
+            background:transparent;
+            border:1px solid transparent;
+            color:var(--text-dim);
+            padding:6px 10px;
+            border-radius:6px;
+            font-size:0.82rem;
+            cursor:pointer;
+            transition:all 0.15s;
+            margin-bottom:2px;
+        }
+        .preset-btn:hover {
+            background:rgba(212,135,14,0.06);
+            color:var(--text);
+        }
+        .preset-btn.active {
+            background:rgba(212,135,14,0.12);
+            border-color:var(--accent-1);
+            color:var(--accent-3);
+        }
+
+        /* Centre — Visualisation + Keyboard */
+        .centre {
+            display:flex;
+            flex-direction:column;
+            overflow:hidden;
+        }
+        .vis-container {
+            flex:1;
+            position:relative;
+            background:#080604;
+            border-bottom:1px solid var(--panel-border);
+            min-height:200px;
+        }
+        #visCanvas {
+            width:100%;
+            height:100%;
+            display:block;
+        }
+        .vis-label {
+            position:absolute;
+            top:10px;
+            left:14px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.65rem;
+            color:var(--text-muted);
+            letter-spacing:0.1em;
+            text-transform:uppercase;
+        }
+        .vis-model-label {
+            position:absolute;
+            top:10px;
+            right:14px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.65rem;
+            color:var(--accent-1);
+            letter-spacing:0.1em;
+            text-transform:uppercase;
+        }
+
+        /* Keyboard */
+        .keyboard-area {
+            height:120px;
+            background:var(--panel);
+            border-top:1px solid var(--panel-border);
+            position:relative;
+            overflow:hidden;
+        }
+        .keyboard {
+            display:flex;
+            height:100%;
+            position:relative;
+        }
+        .key-white {
+            flex:1;
+            background:linear-gradient(180deg,#e8e0d4,#d0c8bc);
+            border:1px solid #999;
+            border-top:none;
+            border-radius:0 0 4px 4px;
+            cursor:pointer;
+            transition:background 0.08s;
+            position:relative;
+            z-index:1;
+        }
+        .key-white:hover { background:linear-gradient(180deg,#fff,#e8e0d4); }
+        .key-white.pressed { background:linear-gradient(180deg,var(--accent-3),var(--accent-1)); }
+        .key-black {
+            position:absolute;
+            width:3.2%;
+            height:60%;
+            background:linear-gradient(180deg,#222,#111);
+            border-radius:0 0 3px 3px;
+            cursor:pointer;
+            z-index:2;
+            transition:background 0.08s;
+        }
+        .key-black:hover { background:linear-gradient(180deg,#444,#222); }
+        .key-black.pressed { background:linear-gradient(180deg,var(--accent-1),var(--accent-2)); }
+
+        /* Right Panel — Controls */
+        .control-panel {
+            background:var(--panel);
+            border-left:1px solid var(--panel-border);
+            overflow-y:auto;
+            padding:14px;
+        }
+        .control-panel::-webkit-scrollbar { width:4px; }
+        .control-panel::-webkit-scrollbar-thumb { background:var(--accent-5); border-radius:2px; }
+
+        .section-title {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.65rem;
+            color:var(--accent-3);
+            text-transform:uppercase;
+            letter-spacing:0.15em;
+            margin-bottom:10px;
+            padding-bottom:4px;
+            border-bottom:1px solid rgba(212,135,14,0.08);
+        }
+        .control-section { margin-bottom:20px; }
+
+        /* Model selector */
+        .model-selector {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:4px;
+            margin-bottom:16px;
+        }
+        .model-btn {
+            background:rgba(212,135,14,0.05);
+            border:1px solid var(--panel-border);
+            color:var(--text-dim);
+            padding:8px 4px;
+            border-radius:6px;
+            font-size:0.72rem;
+            font-family:'JetBrains Mono',monospace;
+            cursor:pointer;
+            transition:all 0.15s;
+            text-align:center;
+        }
+        .model-btn:hover {
+            background:rgba(212,135,14,0.1);
+            color:var(--text);
+        }
+        .model-btn.active {
+            background:rgba(212,135,14,0.18);
+            border-color:var(--accent-1);
+            color:var(--accent-3);
+            box-shadow:0 0 10px var(--glow-2);
+        }
+
+        /* Sliders */
+        .slider-group {
+            margin-bottom:12px;
+        }
+        .slider-label {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            margin-bottom:4px;
+        }
+        .slider-name {
+            font-size:0.75rem;
+            color:var(--text-dim);
+        }
+        .slider-value {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.68rem;
+            color:var(--accent-4);
+            min-width:36px;
+            text-align:right;
+        }
+        input[type="range"] {
+            -webkit-appearance:none;
+            width:100%;
+            height:4px;
+            background:rgba(212,135,14,0.1);
+            border-radius:2px;
+            outline:none;
+            cursor:pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none;
+            width:14px;
+            height:14px;
+            background:var(--accent-1);
+            border-radius:50%;
+            border:2px solid var(--accent-3);
+            box-shadow:0 0 6px var(--glow-1);
+            cursor:pointer;
+        }
+        input[type="range"]::-moz-range-thumb {
+            width:14px;
+            height:14px;
+            background:var(--accent-1);
+            border-radius:50%;
+            border:2px solid var(--accent-3);
+            box-shadow:0 0 6px var(--glow-1);
+            cursor:pointer;
+        }
+
+        /* Excitation selector */
+        .excite-selector {
+            display:grid;
+            grid-template-columns:1fr 1fr 1fr;
+            gap:4px;
+            margin-bottom:14px;
+        }
+        .excite-btn {
+            background:rgba(212,135,14,0.05);
+            border:1px solid var(--panel-border);
+            color:var(--text-dim);
+            padding:6px 2px;
+            border-radius:5px;
+            font-size:0.68rem;
+            cursor:pointer;
+            transition:all 0.15s;
+            text-align:center;
+        }
+        .excite-btn:hover { background:rgba(212,135,14,0.1); color:var(--text); }
+        .excite-btn.active {
+            background:rgba(212,135,14,0.15);
+            border-color:var(--accent-1);
+            color:var(--accent-3);
+        }
+
+        /* Master section */
+        .master-section {
+            background:rgba(212,135,14,0.03);
+            border:1px solid var(--panel-border);
+            border-radius:8px;
+            padding:12px;
+            margin-top:8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <div>
+                <div class="logo">Physical Modelling</div>
+                <div class="logo-sub">resonance engine</div>
+            </div>
+        </div>
+        <div class="transport">
+            <button id="btnSustain">Sustain</button>
+            <button id="btnPoly">Poly</button>
+            <button onclick="location.href='index.html'" style="opacity:0.5">&larr; Back</button>
+        </div>
+    </div>
+
+    <div class="main">
+        <!-- LEFT: Presets -->
+        <div class="preset-panel" id="presetPanel"></div>
+
+        <!-- CENTRE: Vis + Keyboard -->
+        <div class="centre">
+            <div class="vis-container">
+                <canvas id="visCanvas"></canvas>
+                <div class="vis-label">Waveform &middot; Vibration Modes</div>
+                <div class="vis-model-label" id="visModelLabel">String</div>
+            </div>
+            <div class="keyboard-area">
+                <div class="keyboard" id="keyboard"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Controls -->
+        <div class="control-panel">
+            <div class="control-section">
+                <div class="section-title">Physical Model</div>
+                <div class="model-selector" id="modelSelector">
+                    <button class="model-btn active" data-model="string">String</button>
+                    <button class="model-btn" data-model="tube">Tube</button>
+                    <button class="model-btn" data-model="membrane">Membrane</button>
+                    <button class="model-btn" data-model="bar">Bar</button>
+                    <button class="model-btn" data-model="modal">Modal</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Excitation</div>
+                <div class="excite-selector" id="exciteSelector">
+                    <button class="excite-btn active" data-excite="pluck">Pluck</button>
+                    <button class="excite-btn" data-excite="strike">Strike</button>
+                    <button class="excite-btn" data-excite="bow">Bow</button>
+                    <button class="excite-btn" data-excite="blow">Blow</button>
+                    <button class="excite-btn" data-excite="noise">Noise</button>
+                    <button class="excite-btn" data-excite="impulse">Impulse</button>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">String / Waveguide</div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Damping</span><span class="slider-value" id="valDamping">0.50</span></div>
+                    <input type="range" id="slDamping" min="0" max="100" value="50">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Brightness</span><span class="slider-value" id="valBrightness">0.60</span></div>
+                    <input type="range" id="slBrightness" min="0" max="100" value="60">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Pickup Position</span><span class="slider-value" id="valPickup">0.25</span></div>
+                    <input type="range" id="slPickup" min="0" max="100" value="25">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Stiffness</span><span class="slider-value" id="valStiffness">0.00</span></div>
+                    <input type="range" id="slStiffness" min="0" max="100" value="0">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Decay Time</span><span class="slider-value" id="valDecay">0.70</span></div>
+                    <input type="range" id="slDecay" min="0" max="100" value="70">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Body Resonance</div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Body Size</span><span class="slider-value" id="valBody">0.50</span></div>
+                    <input type="range" id="slBody" min="0" max="100" value="50">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Body Tone</span><span class="slider-value" id="valBodyTone">0.50</span></div>
+                    <input type="range" id="slBodyTone" min="0" max="100" value="50">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Sympathetic</span><span class="slider-value" id="valSympathetic">0.00</span></div>
+                    <input type="range" id="slSympathetic" min="0" max="100" value="0">
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="section-title">Effects</div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Reverb</span><span class="slider-value" id="valReverb">0.30</span></div>
+                    <input type="range" id="slReverb" min="0" max="100" value="30">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Chorus</span><span class="slider-value" id="valChorus">0.00</span></div>
+                    <input type="range" id="slChorus" min="0" max="100" value="0">
+                </div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Delay</span><span class="slider-value" id="valDelay">0.00</span></div>
+                    <input type="range" id="slDelay" min="0" max="100" value="0">
+                </div>
+            </div>
+
+            <div class="master-section">
+                <div class="section-title">Master</div>
+                <div class="slider-group">
+                    <div class="slider-label"><span class="slider-name">Volume</span><span class="slider-value" id="valVolume">0.75</span></div>
+                    <input type="range" id="slVolume" min="0" max="100" value="75">
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ============================================================
+// PHYSICAL MODELLING SYNTHESISER — Desktop
+// ============================================================
+
+// --- Audio Context ---
+let audioCtx = null;
+let masterGain, reverbGain, dryGain, chorusGain, delayNode, delayFeedback, convolver;
+let analyser, analyserData;
+const activeVoices = new Map();
+let sustainActive = false;
+let polyMode = true;
+let sustainedNotes = new Set();
+
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.75;
+
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyserData = new Float32Array(analyser.fftSize);
+
+    // Reverb chain
+    reverbGain = audioCtx.createGain();
+    reverbGain.gain.value = 0.3;
+    dryGain = audioCtx.createGain();
+    dryGain.gain.value = 0.7;
+
+    convolver = audioCtx.createConvolver();
+    createReverbIR();
+
+    // Chorus (simple detune oscillator delay)
+    chorusGain = audioCtx.createGain();
+    chorusGain.gain.value = 0;
+
+    // Delay
+    delayNode = audioCtx.createDelay(2.0);
+    delayNode.delayTime.value = 0.3;
+    delayFeedback = audioCtx.createGain();
+    delayFeedback.gain.value = 0;
+
+    // Routing
+    masterGain.connect(dryGain);
+    masterGain.connect(reverbGain);
+    reverbGain.connect(convolver);
+    convolver.connect(analyser);
+    dryGain.connect(analyser);
+
+    // Delay routing
+    masterGain.connect(delayNode);
+    delayNode.connect(delayFeedback);
+    delayFeedback.connect(delayNode);
+    delayNode.connect(analyser);
+
+    analyser.connect(audioCtx.destination);
+}
+
+function createReverbIR() {
+    const rate = audioCtx.sampleRate;
+    const length = rate * 2.5;
+    const ir = audioCtx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+        const data = ir.getChannelData(ch);
+        for (let i = 0; i < length; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (rate * 0.8));
+        }
+    }
+    convolver.buffer = ir;
+}
+
+// --- Presets ---
+const PRESETS = {
+    "Plucked Strings": [
+        { name: "Acoustic Guitar", model:"string", excite:"pluck", damping:45, brightness:65, pickup:20, stiffness:5, decay:72, body:60, bodyTone:55, sympathetic:10, reverb:25, chorus:0, delay:0 },
+        { name: "Nylon Guitar", model:"string", excite:"pluck", damping:55, brightness:50, pickup:25, stiffness:3, decay:68, body:65, bodyTone:45, sympathetic:8, reverb:30, chorus:0, delay:0 },
+        { name: "Electric Guitar", model:"string", excite:"pluck", damping:30, brightness:75, pickup:15, stiffness:8, decay:80, body:25, bodyTone:65, sympathetic:0, reverb:15, chorus:5, delay:0 },
+        { name: "Harpsichord", model:"string", excite:"pluck", damping:25, brightness:85, pickup:10, stiffness:15, decay:55, body:40, bodyTone:70, sympathetic:5, reverb:35, chorus:0, delay:0 },
+        { name: "Banjo", model:"string", excite:"pluck", damping:20, brightness:90, pickup:12, stiffness:12, decay:45, body:55, bodyTone:75, sympathetic:5, reverb:15, chorus:0, delay:0 },
+        { name: "Mandolin", model:"string", excite:"pluck", damping:28, brightness:80, pickup:18, stiffness:10, decay:50, body:50, bodyTone:65, sympathetic:12, reverb:20, chorus:8, delay:0 },
+        { name: "Harp", model:"string", excite:"pluck", damping:60, brightness:55, pickup:30, stiffness:2, decay:85, body:70, bodyTone:40, sympathetic:25, reverb:45, chorus:0, delay:0 },
+        { name: "Koto", model:"string", excite:"pluck", damping:35, brightness:70, pickup:22, stiffness:20, decay:60, body:45, bodyTone:60, sympathetic:15, reverb:30, chorus:0, delay:0 },
+    ],
+    "Bowed Strings": [
+        { name: "Violin", model:"string", excite:"bow", damping:40, brightness:70, pickup:18, stiffness:10, decay:90, body:60, bodyTone:55, sympathetic:20, reverb:30, chorus:5, delay:0 },
+        { name: "Cello", model:"string", excite:"bow", damping:50, brightness:55, pickup:25, stiffness:8, decay:90, body:75, bodyTone:40, sympathetic:25, reverb:35, chorus:3, delay:0 },
+        { name: "Erhu", model:"string", excite:"bow", damping:35, brightness:75, pickup:15, stiffness:5, decay:88, body:40, bodyTone:65, sympathetic:10, reverb:25, chorus:8, delay:0 },
+        { name: "Sarangi", model:"string", excite:"bow", damping:45, brightness:65, pickup:20, stiffness:6, decay:85, body:50, bodyTone:50, sympathetic:40, reverb:30, chorus:5, delay:0 },
+    ],
+    "Struck Strings": [
+        { name: "Piano", model:"string", excite:"strike", damping:42, brightness:68, pickup:22, stiffness:18, decay:78, body:55, bodyTone:50, sympathetic:15, reverb:30, chorus:0, delay:0 },
+        { name: "Honky-Tonk Piano", model:"string", excite:"strike", damping:38, brightness:72, pickup:20, stiffness:20, decay:70, body:50, bodyTone:60, sympathetic:20, reverb:20, chorus:15, delay:0 },
+        { name: "Dulcimer", model:"string", excite:"strike", damping:50, brightness:60, pickup:28, stiffness:12, decay:65, body:60, bodyTone:45, sympathetic:30, reverb:35, chorus:0, delay:0 },
+        { name: "Cimbalom", model:"string", excite:"strike", damping:30, brightness:78, pickup:15, stiffness:16, decay:60, body:55, bodyTone:55, sympathetic:20, reverb:25, chorus:0, delay:0 },
+    ],
+    "Wind Instruments": [
+        { name: "Flute", model:"tube", excite:"blow", damping:55, brightness:60, pickup:50, stiffness:0, decay:75, body:30, bodyTone:65, sympathetic:0, reverb:35, chorus:5, delay:0 },
+        { name: "Clarinet", model:"tube", excite:"blow", damping:45, brightness:50, pickup:40, stiffness:5, decay:80, body:35, bodyTone:45, sympathetic:0, reverb:30, chorus:3, delay:0 },
+        { name: "Didgeridoo", model:"tube", excite:"blow", damping:65, brightness:35, pickup:60, stiffness:0, decay:90, body:80, bodyTone:25, sympathetic:10, reverb:40, chorus:0, delay:5 },
+        { name: "Shakuhachi", model:"tube", excite:"blow", damping:50, brightness:55, pickup:45, stiffness:3, decay:70, body:40, bodyTone:50, sympathetic:5, reverb:45, chorus:0, delay:0 },
+        { name: "Pan Flute", model:"tube", excite:"blow", damping:60, brightness:65, pickup:55, stiffness:0, decay:60, body:25, bodyTone:60, sympathetic:0, reverb:40, chorus:8, delay:0 },
+        { name: "Organ Pipe", model:"tube", excite:"blow", damping:70, brightness:45, pickup:50, stiffness:0, decay:95, body:60, bodyTone:35, sympathetic:5, reverb:50, chorus:0, delay:0 },
+    ],
+    "Struck / Percussion": [
+        { name: "Marimba", model:"bar", excite:"strike", damping:55, brightness:55, pickup:30, stiffness:25, decay:55, body:65, bodyTone:45, sympathetic:5, reverb:25, chorus:0, delay:0 },
+        { name: "Vibraphone", model:"bar", excite:"strike", damping:50, brightness:60, pickup:25, stiffness:30, decay:75, body:55, bodyTone:50, sympathetic:10, reverb:35, chorus:8, delay:0 },
+        { name: "Xylophone", model:"bar", excite:"strike", damping:25, brightness:80, pickup:20, stiffness:40, decay:40, body:40, bodyTone:70, sympathetic:0, reverb:20, chorus:0, delay:0 },
+        { name: "Glockenspiel", model:"bar", excite:"strike", damping:20, brightness:90, pickup:15, stiffness:50, decay:70, body:30, bodyTone:80, sympathetic:5, reverb:40, chorus:0, delay:0 },
+        { name: "Kalimba", model:"bar", excite:"pluck", damping:40, brightness:70, pickup:20, stiffness:35, decay:60, body:50, bodyTone:55, sympathetic:15, reverb:30, chorus:0, delay:0 },
+        { name: "Steel Drum", model:"membrane", excite:"strike", damping:35, brightness:72, pickup:25, stiffness:45, decay:55, body:60, bodyTone:55, sympathetic:10, reverb:25, chorus:5, delay:0 },
+    ],
+    "Bells & Metallic": [
+        { name: "Tubular Bell", model:"modal", excite:"strike", damping:30, brightness:65, pickup:20, stiffness:60, decay:85, body:50, bodyTone:55, sympathetic:15, reverb:50, chorus:0, delay:0 },
+        { name: "Church Bell", model:"modal", excite:"strike", damping:40, brightness:55, pickup:25, stiffness:55, decay:90, body:70, bodyTone:40, sympathetic:25, reverb:60, chorus:0, delay:0 },
+        { name: "Singing Bowl", model:"modal", excite:"bow", damping:65, brightness:45, pickup:35, stiffness:40, decay:95, body:75, bodyTone:35, sympathetic:30, reverb:55, chorus:5, delay:0 },
+        { name: "Gong", model:"modal", excite:"strike", damping:55, brightness:40, pickup:30, stiffness:35, decay:92, body:80, bodyTone:30, sympathetic:35, reverb:55, chorus:0, delay:5 },
+        { name: "Cymbal", model:"modal", excite:"strike", damping:15, brightness:85, pickup:15, stiffness:70, decay:50, body:35, bodyTone:75, sympathetic:10, reverb:25, chorus:0, delay:0 },
+        { name: "Wind Chimes", model:"modal", excite:"strike", damping:35, brightness:75, pickup:20, stiffness:45, decay:65, body:30, bodyTone:65, sympathetic:40, reverb:50, chorus:10, delay:15 },
+    ],
+    "Membranes & Drums": [
+        { name: "Tabla", model:"membrane", excite:"strike", damping:40, brightness:65, pickup:20, stiffness:30, decay:50, body:55, bodyTone:55, sympathetic:10, reverb:20, chorus:0, delay:0 },
+        { name: "Timpani", model:"membrane", excite:"strike", damping:50, brightness:50, pickup:30, stiffness:20, decay:65, body:75, bodyTone:35, sympathetic:5, reverb:35, chorus:0, delay:0 },
+        { name: "Tom Drum", model:"membrane", excite:"strike", damping:35, brightness:55, pickup:25, stiffness:15, decay:45, body:65, bodyTone:45, sympathetic:0, reverb:20, chorus:0, delay:0 },
+        { name: "Djembe", model:"membrane", excite:"strike", damping:30, brightness:70, pickup:18, stiffness:10, decay:40, body:60, bodyTone:60, sympathetic:5, reverb:15, chorus:0, delay:0 },
+    ],
+    "Exotic & Ethnic": [
+        { name: "Sitar", model:"string", excite:"pluck", damping:38, brightness:72, pickup:15, stiffness:18, decay:70, body:50, bodyTone:60, sympathetic:50, reverb:25, chorus:0, delay:0 },
+        { name: "Oud", model:"string", excite:"pluck", damping:48, brightness:58, pickup:22, stiffness:8, decay:65, body:60, bodyTone:48, sympathetic:15, reverb:30, chorus:0, delay:0 },
+        { name: "Shamisen", model:"string", excite:"pluck", damping:25, brightness:78, pickup:12, stiffness:15, decay:48, body:45, bodyTone:65, sympathetic:5, reverb:20, chorus:0, delay:0 },
+        { name: "Berimbau", model:"string", excite:"strike", damping:30, brightness:65, pickup:20, stiffness:10, decay:40, body:55, bodyTone:55, sympathetic:0, reverb:15, chorus:0, delay:5 },
+        { name: "Gamelan", model:"modal", excite:"strike", damping:45, brightness:60, pickup:25, stiffness:50, decay:80, body:65, bodyTone:45, sympathetic:20, reverb:45, chorus:0, delay:8 },
+    ],
+};
+
+let currentModel = 'string';
+let currentExcite = 'pluck';
+let params = {
+    damping: 0.50, brightness: 0.60, pickup: 0.25, stiffness: 0.00,
+    decay: 0.70, body: 0.50, bodyTone: 0.50, sympathetic: 0.00,
+    reverb: 0.30, chorus: 0.00, delay: 0.00, volume: 0.75
+};
+
+// --- Build Preset Panel ---
+function buildPresets() {
+    const panel = document.getElementById('presetPanel');
+    panel.innerHTML = '';
+    for (const [category, presets] of Object.entries(PRESETS)) {
+        const cat = document.createElement('div');
+        cat.className = 'preset-category';
+        cat.innerHTML = `<div class="preset-cat-title">${category}</div>`;
+        for (const p of presets) {
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn';
+            btn.textContent = p.name;
+            btn.onclick = () => loadPreset(p, btn);
+            cat.appendChild(btn);
+        }
+        panel.appendChild(cat);
+    }
+}
+
+function loadPreset(p, btn) {
+    // Update active state
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    // Set model
+    currentModel = p.model;
+    document.querySelectorAll('.model-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.model === p.model);
+    });
+
+    // Set excitation
+    currentExcite = p.excite;
+    document.querySelectorAll('.excite-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.excite === p.excite);
+    });
+
+    // Set sliders
+    setSlider('Damping', p.damping);
+    setSlider('Brightness', p.brightness);
+    setSlider('Pickup', p.pickup);
+    setSlider('Stiffness', p.stiffness);
+    setSlider('Decay', p.decay);
+    setSlider('Body', p.body);
+    setSlider('BodyTone', p.bodyTone);
+    setSlider('Sympathetic', p.sympathetic);
+    setSlider('Reverb', p.reverb);
+    setSlider('Chorus', p.chorus);
+    setSlider('Delay', p.delay);
+
+    updateModelLabel();
+}
+
+function setSlider(name, val) {
+    const sl = document.getElementById('sl' + name);
+    const vl = document.getElementById('val' + name);
+    if (sl && vl) {
+        sl.value = val;
+        const norm = val / 100;
+        vl.textContent = norm.toFixed(2);
+        params[name.toLowerCase()] = norm;
+    }
+    updateEffects();
+}
+
+function updateEffects() {
+    if (!audioCtx) return;
+    reverbGain.gain.setTargetAtTime(params.reverb, audioCtx.currentTime, 0.05);
+    dryGain.gain.setTargetAtTime(1 - params.reverb * 0.5, audioCtx.currentTime, 0.05);
+    delayFeedback.gain.setTargetAtTime(params.delay * 0.6, audioCtx.currentTime, 0.05);
+    masterGain.gain.setTargetAtTime(params.volume, audioCtx.currentTime, 0.05);
+}
+
+function updateModelLabel() {
+    const labels = { string:'String', tube:'Tube', membrane:'Membrane', bar:'Bar', modal:'Modal' };
+    document.getElementById('visModelLabel').textContent = (labels[currentModel] || 'String') + ' · ' + currentExcite;
+}
+
+// --- Wire up controls ---
+function wireControls() {
+    // Model buttons
+    document.querySelectorAll('.model-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentModel = btn.dataset.model;
+            updateModelLabel();
+        };
+    });
+
+    // Excitation buttons
+    document.querySelectorAll('.excite-btn').forEach(btn => {
+        btn.onclick = () => {
+            document.querySelectorAll('.excite-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentExcite = btn.dataset.excite;
+            updateModelLabel();
+        };
+    });
+
+    // Sliders
+    const sliderIds = ['Damping','Brightness','Pickup','Stiffness','Decay','Body','BodyTone','Sympathetic','Reverb','Chorus','Delay','Volume'];
+    for (const name of sliderIds) {
+        const sl = document.getElementById('sl' + name);
+        const vl = document.getElementById('val' + name);
+        if (sl && vl) {
+            sl.addEventListener('input', () => {
+                const norm = sl.value / 100;
+                vl.textContent = norm.toFixed(2);
+                params[name.toLowerCase()] = norm;
+                updateEffects();
+            });
+        }
+    }
+
+    // Sustain
+    document.getElementById('btnSustain').onclick = function() {
+        sustainActive = !sustainActive;
+        this.classList.toggle('active', sustainActive);
+        if (!sustainActive) {
+            // Release all sustained notes
+            sustainedNotes.forEach(note => stopNote(note));
+            sustainedNotes.clear();
+        }
+    };
+
+    // Poly
+    document.getElementById('btnPoly').onclick = function() {
+        polyMode = !polyMode;
+        this.classList.toggle('active', polyMode);
+        this.textContent = polyMode ? 'Poly' : 'Mono';
+    };
+}
+
+// --- Physical Model Voice ---
+class PhysicalVoice {
+    constructor(freq, velocity) {
+        if (!audioCtx) return;
+        this.freq = freq;
+        this.alive = true;
+
+        const now = audioCtx.currentTime;
+        this.output = audioCtx.createGain();
+        this.output.gain.value = 0;
+
+        // Choose synthesis approach based on model
+        switch (currentModel) {
+            case 'string': this.createStringModel(freq, velocity, now); break;
+            case 'tube': this.createTubeModel(freq, velocity, now); break;
+            case 'membrane': this.createMembraneModel(freq, velocity, now); break;
+            case 'bar': this.createBarModel(freq, velocity, now); break;
+            case 'modal': this.createModalModel(freq, velocity, now); break;
+            default: this.createStringModel(freq, velocity, now);
+        }
+
+        this.output.connect(masterGain);
+    }
+
+    createStringModel(freq, vel, now) {
+        // Karplus-Strong inspired: noise burst → delay line with filtering
+        // We approximate with oscillators + filtered noise + envelope shaping
+        const brightness = params.brightness;
+        const damping = params.damping;
+        const stiffness = params.stiffness;
+        const decayTime = params.decay * 4 + 0.5;
+        const pickup = params.pickup;
+        const bodySize = params.body;
+
+        this.nodes = [];
+
+        if (currentExcite === 'bow') {
+            // Bowed: sustained sawtooth with body resonance
+            const saw = audioCtx.createOscillator();
+            saw.type = 'sawtooth';
+            saw.frequency.value = freq;
+            const sawGain = audioCtx.createGain();
+            sawGain.gain.value = 0.15 * vel;
+
+            // Bow pressure variation
+            const lfo = audioCtx.createOscillator();
+            lfo.frequency.value = 4 + Math.random() * 2;
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = freq * 0.003;
+            lfo.connect(lfoGain);
+            lfoGain.connect(saw.frequency);
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = freq * (2 + brightness * 6);
+            filter.Q.value = 1 + stiffness * 3;
+
+            saw.connect(sawGain);
+            sawGain.connect(filter);
+
+            // Body resonance
+            const body = this.createBodyFilter(freq, bodySize);
+            filter.connect(body);
+            body.connect(this.output);
+
+            // Attack envelope for bowing
+            this.output.gain.setValueAtTime(0, now);
+            this.output.gain.linearRampToValueAtTime(0.8, now + 0.15);
+
+            saw.start(now);
+            lfo.start(now);
+            this.nodes.push(saw, lfo);
+            this.sustained = true;
+        } else {
+            // Pluck/Strike: noise excitation + harmonics with decay
+            const harmonics = Math.min(Math.floor(6 + brightness * 14), 20);
+            const exciteType = currentExcite;
+
+            for (let h = 1; h <= harmonics; h++) {
+                const harmFreq = freq * h;
+                if (harmFreq > 18000) break;
+
+                // Inharmonicity from stiffness
+                const inharmonic = 1 + stiffness * 0.0005 * h * h;
+                const actualFreq = freq * h * inharmonic;
+
+                const osc = audioCtx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.value = actualFreq;
+
+                const oscGain = audioCtx.createGain();
+
+                // Pickup position affects harmonic amplitudes
+                const pickupFactor = Math.sin(Math.PI * h * pickup);
+                // Higher harmonics decay faster (damping)
+                const dampFactor = Math.exp(-h * damping * 0.15);
+                const amp = (vel * 0.12 / h) * dampFactor * Math.abs(pickupFactor);
+
+                if (exciteType === 'strike') {
+                    // Strike: quick attack, emphasis on odd harmonics
+                    const oddBoost = h % 2 === 1 ? 1.3 : 0.7;
+                    oscGain.gain.setValueAtTime(amp * oddBoost * 1.5, now);
+                } else {
+                    // Pluck: brief noise-like start
+                    oscGain.gain.setValueAtTime(amp, now);
+                }
+
+                // Decay: higher harmonics die faster
+                const harmDecay = decayTime / (1 + h * 0.3 * damping);
+                oscGain.gain.exponentialRampToValueAtTime(0.0001, now + harmDecay);
+
+                osc.connect(oscGain);
+                oscGain.connect(this.output);
+                osc.start(now);
+                osc.stop(now + harmDecay + 0.1);
+                this.nodes.push(osc);
+            }
+
+            // Excitation noise burst
+            if (exciteType === 'pluck' || exciteType === 'strike' || exciteType === 'noise') {
+                const noiseDur = exciteType === 'strike' ? 0.008 : exciteType === 'noise' ? 0.05 : 0.015;
+                const bufSize = Math.ceil(audioCtx.sampleRate * noiseDur);
+                const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+                const noiseData = noiseBuf.getChannelData(0);
+                for (let i = 0; i < bufSize; i++) {
+                    noiseData[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+                }
+                const noiseSrc = audioCtx.createBufferSource();
+                noiseSrc.buffer = noiseBuf;
+                const noiseFilter = audioCtx.createBiquadFilter();
+                noiseFilter.type = 'bandpass';
+                noiseFilter.frequency.value = freq * (1 + brightness * 2);
+                noiseFilter.Q.value = 0.5;
+                const noiseGain = audioCtx.createGain();
+                noiseGain.gain.value = vel * 0.3 * (exciteType === 'strike' ? 1.5 : 1.0);
+
+                noiseSrc.connect(noiseFilter);
+                noiseFilter.connect(noiseGain);
+                noiseGain.connect(this.output);
+                noiseSrc.start(now);
+                this.nodes.push(noiseSrc);
+            }
+
+            // Body resonance filter
+            const body = this.createBodyFilter(freq, bodySize);
+            // Reconnect output through body
+            const bodyGain = audioCtx.createGain();
+            bodyGain.gain.value = bodySize * 0.3;
+            this.output.connect(bodyGain);
+            bodyGain.connect(body);
+            body.connect(masterGain);
+
+            this.output.gain.setValueAtTime(1.0, now);
+            this.output.gain.exponentialRampToValueAtTime(0.0001, now + decayTime);
+
+            this.stopTime = now + decayTime;
+            this.sustained = false;
+        }
+
+        // Sympathetic resonance
+        if (params.sympathetic > 0.05) {
+            this.addSympathetic(freq, vel, now);
+        }
+    }
+
+    createTubeModel(freq, vel, now) {
+        // Tube/pipe model: odd harmonics dominate (closed pipe) or all harmonics (open pipe)
+        const brightness = params.brightness;
+        const damping = params.damping;
+        const decayTime = params.decay * 5 + 1;
+        const bodySize = params.body;
+        const isOpenPipe = brightness > 0.5;
+
+        this.nodes = [];
+        this.sustained = currentExcite === 'blow';
+
+        const numHarmonics = Math.floor(4 + brightness * 12);
+
+        for (let h = 1; h <= numHarmonics; h++) {
+            const harmNum = isOpenPipe ? h : (h * 2 - 1); // Closed pipe: odd only
+            const harmFreq = freq * harmNum;
+            if (harmFreq > 16000) break;
+
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = harmFreq;
+
+            const oscGain = audioCtx.createGain();
+            const amp = vel * 0.15 / harmNum * Math.exp(-harmNum * damping * 0.08);
+            oscGain.gain.value = 0;
+
+            osc.connect(oscGain);
+            oscGain.connect(this.output);
+
+            if (this.sustained) {
+                // Blow: gradual attack, sustained
+                oscGain.gain.setValueAtTime(0, now);
+                oscGain.gain.linearRampToValueAtTime(amp, now + 0.1 + h * 0.02);
+
+                // Breath noise modulation
+                const breathLfo = audioCtx.createOscillator();
+                breathLfo.frequency.value = 3 + Math.random() * 3;
+                const breathDepth = audioCtx.createGain();
+                breathDepth.gain.value = amp * 0.15;
+                breathLfo.connect(breathDepth);
+                breathDepth.connect(oscGain.gain);
+                breathLfo.start(now);
+                this.nodes.push(breathLfo);
+            } else {
+                oscGain.gain.setValueAtTime(amp, now);
+                oscGain.gain.exponentialRampToValueAtTime(0.0001, now + decayTime / harmNum);
+            }
+
+            osc.start(now);
+            if (!this.sustained) osc.stop(now + decayTime + 0.1);
+            this.nodes.push(osc);
+        }
+
+        // Breathy noise for wind instruments
+        if (currentExcite === 'blow') {
+            const noiseLen = audioCtx.sampleRate * 4;
+            const noiseBuf = audioCtx.createBuffer(1, noiseLen, audioCtx.sampleRate);
+            const nd = noiseBuf.getChannelData(0);
+            for (let i = 0; i < noiseLen; i++) nd[i] = (Math.random() * 2 - 1);
+            const noiseSrc = audioCtx.createBufferSource();
+            noiseSrc.buffer = noiseBuf;
+            noiseSrc.loop = true;
+            const nf = audioCtx.createBiquadFilter();
+            nf.type = 'bandpass';
+            nf.frequency.value = freq * 3;
+            nf.Q.value = 2;
+            const ng = audioCtx.createGain();
+            ng.gain.value = vel * 0.04 * (1 - damping * 0.5);
+            noiseSrc.connect(nf);
+            nf.connect(ng);
+            ng.connect(this.output);
+            noiseSrc.start(now);
+            this.nodes.push(noiseSrc);
+        }
+
+        this.output.gain.setValueAtTime(0, now);
+        this.output.gain.linearRampToValueAtTime(0.8, now + (this.sustained ? 0.12 : 0.005));
+        if (!this.sustained) {
+            this.output.gain.exponentialRampToValueAtTime(0.0001, now + decayTime);
+            this.stopTime = now + decayTime;
+        }
+    }
+
+    createMembraneModel(freq, vel, now) {
+        // Membrane: inharmonic partials based on circular membrane modes
+        // Ratios for ideal circular membrane: 1.000, 1.593, 2.136, 2.296, 2.653, 2.917, 3.156...
+        const modeRatios = [1.000, 1.593, 2.136, 2.296, 2.653, 2.917, 3.156, 3.501, 3.600, 3.652];
+        const damping = params.damping;
+        const brightness = params.brightness;
+        const stiffness = params.stiffness;
+        const decayTime = params.decay * 3 + 0.3;
+
+        this.nodes = [];
+        this.sustained = false;
+
+        for (let i = 0; i < modeRatios.length; i++) {
+            const modeFreq = freq * modeRatios[i] * (1 + stiffness * 0.01 * i);
+            if (modeFreq > 16000) break;
+
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = modeFreq;
+
+            const g = audioCtx.createGain();
+            const amp = vel * 0.1 * Math.exp(-i * (0.2 + damping * 0.3)) * (0.5 + brightness * 0.5);
+            g.gain.setValueAtTime(amp, now);
+
+            const modeDecay = decayTime / (1 + i * 0.4);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + modeDecay);
+
+            osc.connect(g);
+            g.connect(this.output);
+            osc.start(now);
+            osc.stop(now + modeDecay + 0.1);
+            this.nodes.push(osc);
+        }
+
+        // Strike transient
+        const bufSize = Math.ceil(audioCtx.sampleRate * 0.01);
+        const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        const sg = audioCtx.createGain();
+        sg.gain.value = vel * 0.4;
+        src.connect(sg);
+        sg.connect(this.output);
+        src.start(now);
+        this.nodes.push(src);
+
+        this.output.gain.setValueAtTime(1, now);
+        this.output.gain.exponentialRampToValueAtTime(0.0001, now + decayTime);
+        this.stopTime = now + decayTime;
+    }
+
+    createBarModel(freq, vel, now) {
+        // Bar/beam: partials at f, 2.76f, 5.40f, 8.93f... (squared relationship)
+        const barRatios = [1.000, 2.758, 5.406, 8.934, 13.345, 18.636];
+        const damping = params.damping;
+        const brightness = params.brightness;
+        const stiffness = params.stiffness;
+        const decayTime = params.decay * 4 + 0.5;
+
+        this.nodes = [];
+        this.sustained = false;
+
+        for (let i = 0; i < barRatios.length; i++) {
+            const partialFreq = freq * barRatios[i] * (1 + stiffness * 0.005 * i);
+            if (partialFreq > 18000) break;
+
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = partialFreq;
+
+            const g = audioCtx.createGain();
+            const amp = vel * 0.12 * Math.exp(-i * (0.15 + damping * 0.25));
+            g.gain.setValueAtTime(amp, now);
+
+            const partDecay = decayTime / (1 + i * 0.2);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + partDecay);
+
+            osc.connect(g);
+            g.connect(this.output);
+            osc.start(now);
+            osc.stop(now + partDecay + 0.1);
+            this.nodes.push(osc);
+        }
+
+        // Mallet strike
+        const bufSize = Math.ceil(audioCtx.sampleRate * 0.006);
+        const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 2);
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        const nf = audioCtx.createBiquadFilter();
+        nf.type = 'highpass';
+        nf.frequency.value = freq * (1 + brightness * 3);
+        const sg = audioCtx.createGain();
+        sg.gain.value = vel * 0.25;
+        src.connect(nf);
+        nf.connect(sg);
+        sg.connect(this.output);
+        src.start(now);
+        this.nodes.push(src);
+
+        this.output.gain.setValueAtTime(1, now);
+        this.output.gain.exponentialRampToValueAtTime(0.0001, now + decayTime);
+        this.stopTime = now + decayTime;
+    }
+
+    createModalModel(freq, vel, now) {
+        // Modal synthesis: weighted sum of resonant modes
+        // Bell-like partials with slight inharmonicity
+        const modalRatios = [1.0, 2.0, 3.0, 4.2, 5.4, 6.8, 8.1, 9.7, 11.5, 13.2, 15.1, 17.3];
+        const damping = params.damping;
+        const brightness = params.brightness;
+        const stiffness = params.stiffness;
+        const decayTime = params.decay * 6 + 1;
+
+        this.nodes = [];
+        const isBowed = currentExcite === 'bow';
+        this.sustained = isBowed;
+
+        for (let i = 0; i < modalRatios.length; i++) {
+            // Stiffness shifts partials progressively
+            const shift = 1 + stiffness * 0.003 * i * i;
+            const partFreq = freq * modalRatios[i] * shift;
+            if (partFreq > 18000) break;
+
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = partFreq;
+
+            const g = audioCtx.createGain();
+            const amp = vel * 0.08 * Math.exp(-i * (0.1 + damping * 0.2)) * (0.3 + brightness * 0.7);
+
+            if (isBowed) {
+                g.gain.setValueAtTime(0, now);
+                g.gain.linearRampToValueAtTime(amp * 0.7, now + 0.2);
+            } else {
+                g.gain.setValueAtTime(amp, now);
+                const modeDecay = decayTime / (1 + i * 0.15);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + modeDecay);
+            }
+
+            osc.connect(g);
+            g.connect(this.output);
+            osc.start(now);
+            if (!isBowed) osc.stop(now + decayTime + 0.5);
+            this.nodes.push(osc);
+        }
+
+        // Strike transient
+        if (!isBowed) {
+            const bufSize = Math.ceil(audioCtx.sampleRate * 0.004);
+            const buf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < bufSize; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            const sg = audioCtx.createGain();
+            sg.gain.value = vel * 0.2;
+            src.connect(sg);
+            sg.connect(this.output);
+            src.start(now);
+            this.nodes.push(src);
+        }
+
+        this.output.gain.setValueAtTime(isBowed ? 0 : 1, now);
+        if (isBowed) {
+            this.output.gain.linearRampToValueAtTime(0.8, now + 0.15);
+        } else {
+            this.output.gain.exponentialRampToValueAtTime(0.0001, now + decayTime);
+            this.stopTime = now + decayTime;
+        }
+    }
+
+    createBodyFilter(freq, size) {
+        // Simulate body resonance with a peaking filter
+        const bodyFilter = audioCtx.createBiquadFilter();
+        bodyFilter.type = 'peaking';
+        bodyFilter.frequency.value = freq * (0.5 + size * 2);
+        bodyFilter.Q.value = 2 + size * 4;
+        bodyFilter.gain.value = 3 + params.bodytone * 6;
+        return bodyFilter;
+    }
+
+    addSympathetic(freq, vel, now) {
+        // Sympathetic string resonance: soft octave and fifth
+        const sympFreqs = [freq * 2, freq * 1.5, freq * 3];
+        const sympAmp = params.sympathetic * 0.03 * vel;
+        for (const sf of sympFreqs) {
+            if (sf > 12000) continue;
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = sf;
+            const g = audioCtx.createGain();
+            g.gain.setValueAtTime(0, now);
+            g.gain.linearRampToValueAtTime(sympAmp, now + 0.3);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + params.decay * 4);
+            osc.connect(g);
+            g.connect(this.output);
+            osc.start(now);
+            osc.stop(now + params.decay * 4 + 0.1);
+            this.nodes.push(osc);
+        }
+    }
+
+    release() {
+        if (!audioCtx || !this.alive) return;
+        this.alive = false;
+        const now = audioCtx.currentTime;
+
+        if (this.sustained) {
+            this.output.gain.cancelScheduledValues(now);
+            this.output.gain.setValueAtTime(this.output.gain.value, now);
+            this.output.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+            setTimeout(() => this.cleanup(), 400);
+        } else {
+            // Already decaying, just clean up faster
+            setTimeout(() => this.cleanup(), 100);
+        }
+    }
+
+    cleanup() {
+        try {
+            for (const n of this.nodes) {
+                try { n.stop(); } catch(e) {}
+                try { n.disconnect(); } catch(e) {}
+            }
+            this.output.disconnect();
+        } catch(e) {}
+    }
+}
+
+// --- Note Management ---
+function midiToFreq(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+
+function playNote(midiNote, velocity) {
+    initAudio();
+    if (!polyMode) {
+        // Stop all current voices
+        activeVoices.forEach((v, k) => { v.release(); activeVoices.delete(k); });
+    }
+    if (activeVoices.has(midiNote)) {
+        activeVoices.get(midiNote).release();
+        activeVoices.delete(midiNote);
+    }
+    const voice = new PhysicalVoice(midiToFreq(midiNote), velocity || 0.8);
+    activeVoices.set(midiNote, voice);
+}
+
+function stopNote(midiNote) {
+    if (sustainActive) {
+        sustainedNotes.add(midiNote);
+        return;
+    }
+    if (activeVoices.has(midiNote)) {
+        activeVoices.get(midiNote).release();
+        activeVoices.delete(midiNote);
+    }
+}
+
+// --- Build Keyboard ---
+function buildKeyboard() {
+    const kb = document.getElementById('keyboard');
+    kb.innerHTML = '';
+    const startNote = 48; // C3
+    const numOctaves = 3;
+    const whiteNotes = [];
+    const blackNotes = [];
+    const notePattern = [0,2,4,5,7,9,11]; // White key semitones
+    const blackPattern = [1,3,null,6,8,10,null]; // Black key semitones
+
+    for (let oct = 0; oct < numOctaves; oct++) {
+        for (let i = 0; i < 7; i++) {
+            const midi = startNote + oct * 12 + notePattern[i];
+            whiteNotes.push(midi);
+        }
+    }
+    // Add final C
+    whiteNotes.push(startNote + numOctaves * 12);
+
+    // Create white keys
+    for (const midi of whiteNotes) {
+        const key = document.createElement('div');
+        key.className = 'key-white';
+        key.dataset.midi = midi;
+        key.addEventListener('mousedown', (e) => { e.preventDefault(); playNote(midi, 0.8); key.classList.add('pressed'); });
+        key.addEventListener('mouseup', () => { stopNote(midi); key.classList.remove('pressed'); });
+        key.addEventListener('mouseleave', () => { stopNote(midi); key.classList.remove('pressed'); });
+        kb.appendChild(key);
+    }
+
+    // Create black keys
+    const totalWhite = whiteNotes.length;
+    const keyWidth = 100 / totalWhite;
+    for (let oct = 0; oct < numOctaves; oct++) {
+        for (let i = 0; i < 7; i++) {
+            if (blackPattern[i] === null) continue;
+            const midi = startNote + oct * 12 + blackPattern[i];
+            const whiteIndex = oct * 7 + i;
+            const key = document.createElement('div');
+            key.className = 'key-black';
+            key.dataset.midi = midi;
+            key.style.left = ((whiteIndex + 0.65) * keyWidth) + '%';
+            key.addEventListener('mousedown', (e) => { e.preventDefault(); playNote(midi, 0.8); key.classList.add('pressed'); });
+            key.addEventListener('mouseup', () => { stopNote(midi); key.classList.remove('pressed'); });
+            key.addEventListener('mouseleave', () => { stopNote(midi); key.classList.remove('pressed'); });
+            kb.appendChild(key);
+        }
+    }
+}
+
+// --- QWERTY Keyboard Mapping ---
+const keyMap = {
+    'a':48,'w':49,'s':50,'e':51,'d':52,'f':53,'t':54,'g':55,'y':56,'h':57,'u':58,'j':59,
+    'k':60,'o':61,'l':62,'p':63,';':64,"'":65,
+    'z':36,'x':38,'c':40,'v':41,'b':43,'n':45,'m':47
+};
+const pressedKeys = new Set();
+
+document.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    const note = keyMap[e.key.toLowerCase()];
+    if (note !== undefined && !pressedKeys.has(e.key)) {
+        pressedKeys.add(e.key);
+        playNote(note, 0.8);
+        // Highlight keyboard key
+        const el = document.querySelector(`[data-midi="${note}"]`);
+        if (el) el.classList.add('pressed');
+    }
+});
+document.addEventListener('keyup', (e) => {
+    const note = keyMap[e.key.toLowerCase()];
+    if (note !== undefined) {
+        pressedKeys.delete(e.key);
+        stopNote(note);
+        const el = document.querySelector(`[data-midi="${note}"]`);
+        if (el) el.classList.remove('pressed');
+    }
+});
+
+// --- Visualisation ---
+function initVis() {
+    const canvas = document.getElementById('visCanvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+
+    function resizeVis() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+        canvas.style.width = rect.width + 'px';
+        canvas.style.height = rect.height + 'px';
+    }
+    resizeVis();
+    window.addEventListener('resize', () => { ctx.setTransform(1,0,0,1,0,0); resizeVis(); });
+
+    function drawVis() {
+        const w = canvas.width / dpr;
+        const h = canvas.height / dpr;
+        ctx.fillStyle = '#080604';
+        ctx.fillRect(0, 0, w, h);
+
+        if (analyser) {
+            analyser.getFloatTimeDomainData(analyserData);
+
+            // Waveform
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(212,135,14,0.6)';
+            ctx.lineWidth = 1.5;
+            const sliceWidth = w / analyserData.length;
+            for (let i = 0; i < analyserData.length; i++) {
+                const x = i * sliceWidth;
+                const y = h / 2 + analyserData[i] * h * 0.4;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+
+            // Glow layer
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(232,168,73,0.15)';
+            ctx.lineWidth = 4;
+            for (let i = 0; i < analyserData.length; i++) {
+                const x = i * sliceWidth;
+                const y = h / 2 + analyserData[i] * h * 0.4;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+
+        // Centre line
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(212,135,14,0.08)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 8]);
+        ctx.moveTo(0, canvas.height / dpr / 2);
+        ctx.lineTo(canvas.width / dpr, canvas.height / dpr / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        requestAnimationFrame(drawVis);
+    }
+    drawVis();
+}
+
+// --- Init ---
+buildPresets();
+buildKeyboard();
+wireControls();
+initVis();
+
+// Load first preset
+const firstBtn = document.querySelector('.preset-btn');
+if (firstBtn) {
+    const firstPreset = Object.values(PRESETS)[0][0];
+    loadPreset(firstPreset, firstBtn);
+}
+</script>
+</body>
+</html>

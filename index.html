@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physical Modelling Synth — Resonance Engine</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000000;
+            --accent-1: #d4870e;
+            --accent-2: #b8621b;
+            --accent-3: #e8a849;
+            --accent-4: #c9955a;
+            --text: #e8e0d4;
+            --text-dim: rgba(255,245,230,0.45);
+            --glow-1: rgba(212,135,14,0.35);
+            --glow-2: rgba(184,98,27,0.25);
+            --glow-3: rgba(232,168,73,0.2);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 1.5rem 1.5rem env(safe-area-inset-bottom, 1rem);
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        canvas#bgCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+        .content {
+            position: relative;
+            z-index: 1;
+            max-width: 520px;
+            width: 100%;
+        }
+        .icon-glyph {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1rem;
+            position: relative;
+        }
+        .icon-glyph svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 0 20px var(--glow-1)) drop-shadow(0 0 40px var(--glow-2));
+        }
+        h1 {
+            font-size: clamp(2rem, 6vw, 3.2rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--accent-3), var(--accent-1), var(--accent-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.4rem;
+        }
+        .subtitle {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+        }
+        .description {
+            font-size: 1rem;
+            line-height: 1.7;
+            color: var(--text-dim);
+            margin-bottom: 1.5rem;
+            font-weight: 300;
+        }
+        .description strong {
+            color: var(--text);
+            font-weight: 400;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+        .feature {
+            padding: 14px 16px;
+            background: rgba(255,245,230,0.03);
+            border: 1px solid rgba(255,245,230,0.06);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        .feature-title {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--accent-3);
+            margin-bottom: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        .feature-desc {
+            font-size: 0.82rem;
+            color: var(--text-dim);
+            line-height: 1.4;
+        }
+
+        .version-buttons {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        a.launch-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: white;
+            text-decoration: none;
+            padding: 0.9rem 2rem;
+            border-radius: 50px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            letter-spacing: 0.02em;
+            position: relative;
+        }
+        a.launch-btn.primary {
+            background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+            box-shadow: 0 4px 20px var(--glow-1), 0 0 40px var(--glow-2);
+        }
+        a.launch-btn.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px var(--glow-1), 0 0 60px var(--glow-2);
+        }
+        a.launch-btn.secondary {
+            background: rgba(255,245,230,0.04);
+            border: 1px solid rgba(255,245,230,0.12);
+            backdrop-filter: blur(10px);
+        }
+        a.launch-btn.secondary:hover {
+            background: rgba(255,245,230,0.08);
+            border-color: var(--accent-1);
+            transform: translateY(-2px);
+        }
+        a.launch-btn:active { transform: scale(0.97); }
+        .launch-arrow {
+            font-size: 1.2rem;
+            transition: transform 0.3s;
+        }
+        a.launch-btn:hover .launch-arrow { transform: translateX(3px); }
+        .btn-tag {
+            font-size: 0.6rem;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            position: absolute;
+            top: -8px;
+            right: 16px;
+            background: var(--accent-1);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 8px;
+            opacity: 0.9;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 1.2rem 0 1rem;
+            width: 100%;
+        }
+        .divider-line {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(212,135,14,0.2), transparent);
+        }
+        .divider-dot {
+            width: 4px; height: 4px;
+            background: var(--accent-1);
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+        footer {
+            margin-top: 0.8rem;
+            padding-bottom: 0.5rem;
+        }
+        footer p {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: rgba(255,245,230,0.2);
+            letter-spacing: 0.1em;
+        }
+        footer a {
+            color: rgba(255,245,230,0.3);
+            text-decoration: none;
+        }
+        footer a:hover { color: var(--accent-3); }
+
+        @media (max-width: 480px) {
+            .features { grid-template-columns: 1fr 1fr; gap: 8px; }
+            .content { padding: 0 0.5rem; }
+            .version-buttons { flex-direction: column; align-items: center; gap: 10px; }
+            .icon-glyph { width: 60px; height: 60px; margin-bottom: 0.6rem; }
+            h1 { font-size: 1.8rem; margin-bottom: 0.2rem; }
+            .subtitle { margin-bottom: 0.8rem; font-size: 0.75rem; }
+            .description { font-size: 0.9rem; margin-bottom: 1rem; line-height: 1.5; }
+            .feature { padding: 10px 12px; }
+            a.launch-btn { padding: 0.8rem 1.8rem; font-size: 1rem; }
+        }
+        @media (max-height: 700px) {
+            .icon-glyph { width: 50px; height: 50px; margin-bottom: 0.5rem; }
+            .description { display: none; }
+            .subtitle { margin-bottom: 0.8rem; }
+            .features { margin-bottom: 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="bgCanvas"></canvas>
+
+    <div class="content">
+        <div class="icon-glyph">
+            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Vibrating string representation -->
+                <path d="M15 50 Q 30 25, 50 50 Q 70 75, 85 50" stroke="url(#gs1)" stroke-width="2" fill="none" opacity="0.9">
+                    <animate attributeName="d" dur="2s" repeatCount="indefinite"
+                        values="M15 50 Q 30 25, 50 50 Q 70 75, 85 50;
+                                M15 50 Q 30 65, 50 50 Q 70 35, 85 50;
+                                M15 50 Q 30 25, 50 50 Q 70 75, 85 50"/>
+                </path>
+                <path d="M15 50 Q 35 35, 50 50 Q 65 65, 85 50" stroke="url(#gs1)" stroke-width="1.2" fill="none" opacity="0.5">
+                    <animate attributeName="d" dur="1.3s" repeatCount="indefinite"
+                        values="M15 50 Q 35 35, 50 50 Q 65 65, 85 50;
+                                M15 50 Q 35 58, 50 50 Q 65 42, 85 50;
+                                M15 50 Q 35 35, 50 50 Q 65 65, 85 50"/>
+                </path>
+                <path d="M15 50 Q 28 42, 38 50 Q 48 58, 58 50 Q 68 42, 85 50" stroke="url(#gs1)" stroke-width="0.8" fill="none" opacity="0.3">
+                    <animate attributeName="d" dur="0.8s" repeatCount="indefinite"
+                        values="M15 50 Q 28 42, 38 50 Q 48 58, 58 50 Q 68 42, 85 50;
+                                M15 50 Q 28 55, 38 50 Q 48 45, 58 50 Q 68 55, 85 50;
+                                M15 50 Q 28 42, 38 50 Q 48 58, 58 50 Q 68 42, 85 50"/>
+                </path>
+                <!-- Bridge nodes -->
+                <circle cx="15" cy="50" r="3" fill="#d4870e" opacity="0.9"/>
+                <circle cx="85" cy="50" r="3" fill="#d4870e" opacity="0.9"/>
+                <!-- Resonance rings -->
+                <circle cx="50" cy="50" r="40" stroke="url(#gs1)" stroke-width="1" opacity="0.15"/>
+                <circle cx="50" cy="50" r="30" stroke="url(#gs1)" stroke-width="0.8" opacity="0.1"/>
+                <defs>
+                    <linearGradient id="gs1" x1="15" y1="30" x2="85" y2="70">
+                        <stop offset="0%" stop-color="#e8a849"/>
+                        <stop offset="50%" stop-color="#d4870e"/>
+                        <stop offset="100%" stop-color="#b8621b"/>
+                    </linearGradient>
+                </defs>
+            </svg>
+        </div>
+
+        <h1>Physical Modelling</h1>
+        <p class="subtitle">resonance engine</p>
+
+        <p class="description">
+            Real-time <strong>physical modelling synthesis</strong> in the browser.
+            Simulate vibrating <strong>strings, tubes, membranes</strong>, and
+            <strong>resonant bodies</strong> — driven by the physics of
+            sound itself with <strong>interactive visual feedback</strong>.
+        </p>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-title">5 Models</div>
+                <div class="feature-desc">String, Tube, Membrane, Bar, and Modal resonance</div>
+            </div>
+            <div class="feature">
+                <div class="feature-title">30+ Presets</div>
+                <div class="feature-desc">Guitar, Sitar, Flute, Marimba, Gong, Bell and more</div>
+            </div>
+            <div class="feature">
+                <div class="feature-title">Real Physics</div>
+                <div class="feature-desc">Karplus-Strong, waveguides, and modal synthesis</div>
+            </div>
+            <div class="feature">
+                <div class="feature-title">Visuals</div>
+                <div class="feature-desc">Watch vibration modes animate in real time</div>
+            </div>
+        </div>
+
+        <div class="version-buttons" id="versionButtons">
+            <a class="launch-btn primary" href="desktop.html" id="btnDesktop">
+                Desktop <span class="launch-arrow">&rarr;</span>
+            </a>
+            <a class="launch-btn secondary" href="mobile.html" id="btnMobile">
+                Mobile <span class="launch-arrow">&rarr;</span>
+            </a>
+        </div>
+
+        <div class="divider">
+            <span class="divider-line"></span>
+            <span class="divider-dot"></span>
+            <span class="divider-line"></span>
+        </div>
+
+        <footer>
+            <p>Web Audio API &middot; Canvas &middot; No dependencies</p>
+            <p style="margin-top:6px;"><a href="https://github.com/BrendanJamesLynskey/Synth_Physical_Modelling">source on github</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Device detection
+        var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) ||
+                       (navigator.maxTouchPoints > 1 && window.innerWidth < 768);
+        var btnDesktop = document.getElementById('btnDesktop');
+        var btnMobile = document.getElementById('btnMobile');
+        var container = document.getElementById('versionButtons');
+        if (isMobile) {
+            btnMobile.classList.remove('secondary');
+            btnMobile.classList.add('primary');
+            btnMobile.innerHTML = '<span class="btn-tag">recommended</span>Mobile <span class="launch-arrow">&rarr;</span>';
+            btnDesktop.classList.remove('primary');
+            btnDesktop.classList.add('secondary');
+            container.insertBefore(btnMobile, btnDesktop);
+        } else {
+            btnDesktop.innerHTML = '<span class="btn-tag">recommended</span>Desktop <span class="launch-arrow">&rarr;</span>';
+        }
+
+        // Standing wave background animation
+        const c = document.getElementById('bgCanvas');
+        const ctx = c.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        let W, H;
+        function resize() {
+            W = window.innerWidth; H = window.innerHeight;
+            c.width = W * dpr; c.height = H * dpr;
+            ctx.scale(dpr, dpr);
+        }
+        resize();
+        window.addEventListener('resize', () => { ctx.setTransform(1,0,0,1,0,0); resize(); });
+
+        let t = 0;
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, W, H);
+            t += 0.008;
+
+            // Draw multiple standing wave harmonics
+            const modes = [
+                { n: 1, amp: 30, speed: 1.0, color: 'rgba(212,135,14,', decay: 0.08 },
+                { n: 2, amp: 20, speed: 1.5, color: 'rgba(184,98,27,', decay: 0.06 },
+                { n: 3, amp: 14, speed: 2.0, color: 'rgba(232,168,73,', decay: 0.05 },
+                { n: 4, amp: 10, speed: 2.5, color: 'rgba(201,149,90,', decay: 0.04 },
+                { n: 5, amp: 7, speed: 3.0, color: 'rgba(212,135,14,', decay: 0.03 },
+                { n: 7, amp: 4, speed: 4.0, color: 'rgba(184,98,27,', decay: 0.02 },
+            ];
+
+            for (const m of modes) {
+                const yBase = H * 0.5;
+                const envelope = Math.sin(t * m.speed * 0.5) * 0.5 + 0.5;
+                ctx.beginPath();
+                for (let x = 0; x <= W; x += 2) {
+                    const nx = x / W;
+                    const standing = Math.sin(m.n * Math.PI * nx);
+                    const temporal = Math.cos(t * m.speed * 2);
+                    const y = yBase + standing * temporal * m.amp * (0.3 + envelope * 0.7);
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = m.color + (m.decay * 3) + ')';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+
+            // Subtle floating particles (resonance dust)
+            for (let i = 0; i < 40; i++) {
+                const seed = i * 137.508;
+                const px = ((seed * 7.3 + t * 8) % W);
+                const py = ((seed * 13.1 + Math.sin(t + seed) * 40) % H);
+                const alpha = 0.1 + 0.1 * Math.sin(t * 2 + seed);
+                ctx.beginPath();
+                ctx.arc(px, py, 1, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(212,135,14,${alpha})`;
+                ctx.fill();
+            }
+
+            requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>

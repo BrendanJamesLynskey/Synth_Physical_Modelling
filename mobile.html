@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Physical Modelling Synth — Mobile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0806;
+            --panel: #111010;
+            --panel-border: rgba(212,135,14,0.1);
+            --accent-1: #d4870e;
+            --accent-2: #b8621b;
+            --accent-3: #e8a849;
+            --accent-4: #c9955a;
+            --text: #e8e0d4;
+            --text-dim: rgba(255,245,230,0.45);
+            --text-muted: rgba(255,245,230,0.25);
+            --glow-1: rgba(212,135,14,0.3);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        html, body {
+            font-family:'Inter',sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            height:100%;
+            height:100dvh;
+            overflow:hidden;
+            user-select:none;
+            -webkit-user-select:none;
+            touch-action:none;
+        }
+
+        .app {
+            display:flex;
+            flex-direction:column;
+            height:100%;
+            height:100dvh;
+            padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+        }
+
+        /* Header */
+        .header {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:8px 12px;
+            background:var(--panel);
+            border-bottom:1px solid var(--panel-border);
+            flex-shrink:0;
+        }
+        .logo {
+            font-size:0.9rem;
+            font-weight:700;
+            background:linear-gradient(135deg,var(--accent-3),var(--accent-1));
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            background-clip:text;
+        }
+        .header-btns {
+            display:flex;
+            gap:6px;
+        }
+        .hdr-btn {
+            background:rgba(212,135,14,0.08);
+            border:1px solid var(--panel-border);
+            color:var(--text-dim);
+            padding:5px 10px;
+            border-radius:6px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.65rem;
+            cursor:pointer;
+            transition:all 0.15s;
+        }
+        .hdr-btn.active {
+            background:var(--accent-1);
+            color:#000;
+            border-color:var(--accent-1);
+        }
+
+        /* Tab bar */
+        .tab-bar {
+            display:flex;
+            background:var(--panel);
+            border-bottom:1px solid var(--panel-border);
+            flex-shrink:0;
+        }
+        .tab {
+            flex:1;
+            padding:8px;
+            text-align:center;
+            font-size:0.72rem;
+            font-family:'JetBrains Mono',monospace;
+            color:var(--text-muted);
+            letter-spacing:0.08em;
+            text-transform:uppercase;
+            border-bottom:2px solid transparent;
+            cursor:pointer;
+            transition:all 0.15s;
+        }
+        .tab.active {
+            color:var(--accent-3);
+            border-bottom-color:var(--accent-1);
+        }
+
+        /* Content panels */
+        .panel {
+            flex:1;
+            overflow-y:auto;
+            overflow-x:hidden;
+            display:none;
+        }
+        .panel.active { display:flex; flex-direction:column; }
+
+        /* ===== PLAY TAB ===== */
+        .vis-area {
+            height:100px;
+            flex-shrink:0;
+            background:#080604;
+            position:relative;
+        }
+        #visCanvas { width:100%; height:100%; display:block; }
+        .vis-info {
+            position:absolute;
+            top:6px;
+            left:10px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.6rem;
+            color:var(--text-muted);
+            letter-spacing:0.08em;
+            text-transform:uppercase;
+        }
+        .vis-model {
+            position:absolute;
+            top:6px;
+            right:10px;
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.6rem;
+            color:var(--accent-1);
+            letter-spacing:0.08em;
+            text-transform:uppercase;
+        }
+
+        /* Note pads */
+        .pads-container {
+            flex:1;
+            display:grid;
+            grid-template-columns:repeat(4,1fr);
+            gap:6px;
+            padding:8px;
+            min-height:0;
+        }
+        .pad {
+            background:rgba(212,135,14,0.06);
+            border:1px solid var(--panel-border);
+            border-radius:10px;
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            justify-content:center;
+            cursor:pointer;
+            transition:all 0.1s;
+            position:relative;
+            overflow:hidden;
+        }
+        .pad:active, .pad.pressed {
+            background:rgba(212,135,14,0.2);
+            border-color:var(--accent-1);
+            box-shadow:0 0 15px var(--glow-1);
+        }
+        .pad-note {
+            font-size:0.85rem;
+            font-weight:600;
+            color:var(--text);
+        }
+        .pad-oct {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.6rem;
+            color:var(--text-muted);
+            margin-top:2px;
+        }
+        .pad.black-key {
+            background:rgba(0,0,0,0.3);
+            border-color:rgba(212,135,14,0.06);
+        }
+        .pad.black-key:active, .pad.black-key.pressed {
+            background:rgba(184,98,27,0.25);
+            border-color:var(--accent-2);
+        }
+
+        /* Octave controls */
+        .octave-bar {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:12px;
+            padding:6px;
+            flex-shrink:0;
+            background:var(--panel);
+            border-top:1px solid var(--panel-border);
+        }
+        .oct-btn {
+            background:rgba(212,135,14,0.08);
+            border:1px solid var(--panel-border);
+            color:var(--text);
+            width:36px;
+            height:36px;
+            border-radius:8px;
+            font-size:1.1rem;
+            cursor:pointer;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+        }
+        .oct-label {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.75rem;
+            color:var(--text-dim);
+        }
+
+        /* ===== PRESETS TAB ===== */
+        .preset-list {
+            padding:10px;
+        }
+        .preset-category { margin-bottom:14px; }
+        .preset-cat-title {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.62rem;
+            color:var(--accent-3);
+            text-transform:uppercase;
+            letter-spacing:0.12em;
+            margin-bottom:6px;
+            padding-bottom:4px;
+            border-bottom:1px solid rgba(212,135,14,0.08);
+        }
+        .preset-grid {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:6px;
+        }
+        .preset-btn {
+            background:rgba(212,135,14,0.04);
+            border:1px solid var(--panel-border);
+            color:var(--text-dim);
+            padding:10px 8px;
+            border-radius:8px;
+            font-size:0.78rem;
+            text-align:left;
+            cursor:pointer;
+            transition:all 0.15s;
+        }
+        .preset-btn:hover, .preset-btn:active {
+            background:rgba(212,135,14,0.1);
+            color:var(--text);
+        }
+        .preset-btn.active {
+            background:rgba(212,135,14,0.14);
+            border-color:var(--accent-1);
+            color:var(--accent-3);
+        }
+
+        /* ===== CONTROLS TAB ===== */
+        .controls-area {
+            padding:12px;
+        }
+        .section-title {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.62rem;
+            color:var(--accent-3);
+            text-transform:uppercase;
+            letter-spacing:0.12em;
+            margin:14px 0 8px;
+            padding-bottom:4px;
+            border-bottom:1px solid rgba(212,135,14,0.08);
+        }
+        .section-title:first-child { margin-top:0; }
+
+        .btn-row {
+            display:flex;
+            gap:4px;
+            flex-wrap:wrap;
+            margin-bottom:10px;
+        }
+        .sel-btn {
+            flex:1;
+            min-width:0;
+            background:rgba(212,135,14,0.05);
+            border:1px solid var(--panel-border);
+            color:var(--text-dim);
+            padding:8px 4px;
+            border-radius:6px;
+            font-size:0.7rem;
+            cursor:pointer;
+            text-align:center;
+            transition:all 0.15s;
+        }
+        .sel-btn.active {
+            background:rgba(212,135,14,0.15);
+            border-color:var(--accent-1);
+            color:var(--accent-3);
+        }
+
+        .slider-group { margin-bottom:10px; }
+        .slider-label {
+            display:flex;
+            justify-content:space-between;
+            margin-bottom:3px;
+        }
+        .slider-name {
+            font-size:0.72rem;
+            color:var(--text-dim);
+        }
+        .slider-value {
+            font-family:'JetBrains Mono',monospace;
+            font-size:0.65rem;
+            color:var(--accent-4);
+        }
+        input[type="range"] {
+            -webkit-appearance:none;
+            width:100%;
+            height:6px;
+            background:rgba(212,135,14,0.1);
+            border-radius:3px;
+            outline:none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance:none;
+            width:20px;
+            height:20px;
+            background:var(--accent-1);
+            border-radius:50%;
+            border:2px solid var(--accent-3);
+            box-shadow:0 0 6px var(--glow-1);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width:20px;
+            height:20px;
+            background:var(--accent-1);
+            border-radius:50%;
+            border:2px solid var(--accent-3);
+        }
+
+        .back-link {
+            display:block;
+            text-align:center;
+            color:var(--text-muted);
+            font-size:0.7rem;
+            padding:10px;
+            text-decoration:none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <div class="logo">Physical Modelling</div>
+            <div class="header-btns">
+                <button class="hdr-btn" id="btnSustain">SUS</button>
+                <button class="hdr-btn" onclick="location.href='index.html'">&larr;</button>
+            </div>
+        </div>
+
+        <div class="tab-bar">
+            <div class="tab active" data-tab="play">Play</div>
+            <div class="tab" data-tab="presets">Presets</div>
+            <div class="tab" data-tab="controls">Controls</div>
+        </div>
+
+        <!-- PLAY TAB -->
+        <div class="panel active" id="panelPlay" data-panel="play">
+            <div class="vis-area">
+                <canvas id="visCanvas"></canvas>
+                <div class="vis-info">Waveform</div>
+                <div class="vis-model" id="visModelLabel">String · Pluck</div>
+            </div>
+            <div class="pads-container" id="padsContainer"></div>
+            <div class="octave-bar">
+                <button class="oct-btn" id="octDown">-</button>
+                <span class="oct-label" id="octLabel">Octave 4</span>
+                <button class="oct-btn" id="octUp">+</button>
+            </div>
+        </div>
+
+        <!-- PRESETS TAB -->
+        <div class="panel" id="panelPresets" data-panel="presets">
+            <div class="preset-list" id="presetList"></div>
+        </div>
+
+        <!-- CONTROLS TAB -->
+        <div class="panel" id="panelControls" data-panel="controls">
+            <div class="controls-area">
+                <div class="section-title">Physical Model</div>
+                <div class="btn-row" id="modelRow"></div>
+
+                <div class="section-title">Excitation</div>
+                <div class="btn-row" id="exciteRow"></div>
+
+                <div class="section-title">String / Waveguide</div>
+                <div id="mainSliders"></div>
+
+                <div class="section-title">Body Resonance</div>
+                <div id="bodySliders"></div>
+
+                <div class="section-title">Effects</div>
+                <div id="fxSliders"></div>
+
+                <div class="section-title">Master</div>
+                <div id="masterSliders"></div>
+
+                <a href="index.html" class="back-link">&larr; Back to launcher</a>
+            </div>
+        </div>
+    </div>
+
+<script>
+// ============================================================
+// PHYSICAL MODELLING SYNTHESISER — Mobile
+// ============================================================
+
+let audioCtx = null;
+let masterGain, reverbGain, dryGain, convolver, delayNode, delayFeedback, analyser, analyserData;
+const activeVoices = new Map();
+let sustainActive = false;
+let currentOctave = 4;
+
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.75;
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyserData = new Float32Array(analyser.fftSize);
+    reverbGain = audioCtx.createGain();
+    reverbGain.gain.value = 0.3;
+    dryGain = audioCtx.createGain();
+    dryGain.gain.value = 0.7;
+    convolver = audioCtx.createConvolver();
+    const rate = audioCtx.sampleRate;
+    const len = rate * 2.5;
+    const ir = audioCtx.createBuffer(2, len, rate);
+    for (let ch = 0; ch < 2; ch++) {
+        const d = ir.getChannelData(ch);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (rate * 0.8));
+    }
+    convolver.buffer = ir;
+    delayNode = audioCtx.createDelay(2.0);
+    delayNode.delayTime.value = 0.3;
+    delayFeedback = audioCtx.createGain();
+    delayFeedback.gain.value = 0;
+    masterGain.connect(dryGain);
+    masterGain.connect(reverbGain);
+    reverbGain.connect(convolver);
+    convolver.connect(analyser);
+    dryGain.connect(analyser);
+    masterGain.connect(delayNode);
+    delayNode.connect(delayFeedback);
+    delayFeedback.connect(delayNode);
+    delayNode.connect(analyser);
+    analyser.connect(audioCtx.destination);
+}
+
+// --- Presets (same as desktop) ---
+const PRESETS = {
+    "Plucked Strings": [
+        { name:"Acoustic Guitar", model:"string", excite:"pluck", damping:45, brightness:65, pickup:20, stiffness:5, decay:72, body:60, bodyTone:55, sympathetic:10, reverb:25, chorus:0, delay:0 },
+        { name:"Nylon Guitar", model:"string", excite:"pluck", damping:55, brightness:50, pickup:25, stiffness:3, decay:68, body:65, bodyTone:45, sympathetic:8, reverb:30, chorus:0, delay:0 },
+        { name:"Electric Guitar", model:"string", excite:"pluck", damping:30, brightness:75, pickup:15, stiffness:8, decay:80, body:25, bodyTone:65, sympathetic:0, reverb:15, chorus:5, delay:0 },
+        { name:"Harpsichord", model:"string", excite:"pluck", damping:25, brightness:85, pickup:10, stiffness:15, decay:55, body:40, bodyTone:70, sympathetic:5, reverb:35, chorus:0, delay:0 },
+        { name:"Banjo", model:"string", excite:"pluck", damping:20, brightness:90, pickup:12, stiffness:12, decay:45, body:55, bodyTone:75, sympathetic:5, reverb:15, chorus:0, delay:0 },
+        { name:"Harp", model:"string", excite:"pluck", damping:60, brightness:55, pickup:30, stiffness:2, decay:85, body:70, bodyTone:40, sympathetic:25, reverb:45, chorus:0, delay:0 },
+        { name:"Koto", model:"string", excite:"pluck", damping:35, brightness:70, pickup:22, stiffness:20, decay:60, body:45, bodyTone:60, sympathetic:15, reverb:30, chorus:0, delay:0 },
+    ],
+    "Bowed Strings": [
+        { name:"Violin", model:"string", excite:"bow", damping:40, brightness:70, pickup:18, stiffness:10, decay:90, body:60, bodyTone:55, sympathetic:20, reverb:30, chorus:5, delay:0 },
+        { name:"Cello", model:"string", excite:"bow", damping:50, brightness:55, pickup:25, stiffness:8, decay:90, body:75, bodyTone:40, sympathetic:25, reverb:35, chorus:3, delay:0 },
+        { name:"Erhu", model:"string", excite:"bow", damping:35, brightness:75, pickup:15, stiffness:5, decay:88, body:40, bodyTone:65, sympathetic:10, reverb:25, chorus:8, delay:0 },
+    ],
+    "Struck Strings": [
+        { name:"Piano", model:"string", excite:"strike", damping:42, brightness:68, pickup:22, stiffness:18, decay:78, body:55, bodyTone:50, sympathetic:15, reverb:30, chorus:0, delay:0 },
+        { name:"Dulcimer", model:"string", excite:"strike", damping:50, brightness:60, pickup:28, stiffness:12, decay:65, body:60, bodyTone:45, sympathetic:30, reverb:35, chorus:0, delay:0 },
+    ],
+    "Wind Instruments": [
+        { name:"Flute", model:"tube", excite:"blow", damping:55, brightness:60, pickup:50, stiffness:0, decay:75, body:30, bodyTone:65, sympathetic:0, reverb:35, chorus:5, delay:0 },
+        { name:"Clarinet", model:"tube", excite:"blow", damping:45, brightness:50, pickup:40, stiffness:5, decay:80, body:35, bodyTone:45, sympathetic:0, reverb:30, chorus:3, delay:0 },
+        { name:"Didgeridoo", model:"tube", excite:"blow", damping:65, brightness:35, pickup:60, stiffness:0, decay:90, body:80, bodyTone:25, sympathetic:10, reverb:40, chorus:0, delay:5 },
+        { name:"Shakuhachi", model:"tube", excite:"blow", damping:50, brightness:55, pickup:45, stiffness:3, decay:70, body:40, bodyTone:50, sympathetic:5, reverb:45, chorus:0, delay:0 },
+        { name:"Pan Flute", model:"tube", excite:"blow", damping:60, brightness:65, pickup:55, stiffness:0, decay:60, body:25, bodyTone:60, sympathetic:0, reverb:40, chorus:8, delay:0 },
+    ],
+    "Struck / Percussion": [
+        { name:"Marimba", model:"bar", excite:"strike", damping:55, brightness:55, pickup:30, stiffness:25, decay:55, body:65, bodyTone:45, sympathetic:5, reverb:25, chorus:0, delay:0 },
+        { name:"Vibraphone", model:"bar", excite:"strike", damping:50, brightness:60, pickup:25, stiffness:30, decay:75, body:55, bodyTone:50, sympathetic:10, reverb:35, chorus:8, delay:0 },
+        { name:"Glockenspiel", model:"bar", excite:"strike", damping:20, brightness:90, pickup:15, stiffness:50, decay:70, body:30, bodyTone:80, sympathetic:5, reverb:40, chorus:0, delay:0 },
+        { name:"Kalimba", model:"bar", excite:"pluck", damping:40, brightness:70, pickup:20, stiffness:35, decay:60, body:50, bodyTone:55, sympathetic:15, reverb:30, chorus:0, delay:0 },
+    ],
+    "Bells & Metallic": [
+        { name:"Tubular Bell", model:"modal", excite:"strike", damping:30, brightness:65, pickup:20, stiffness:60, decay:85, body:50, bodyTone:55, sympathetic:15, reverb:50, chorus:0, delay:0 },
+        { name:"Church Bell", model:"modal", excite:"strike", damping:40, brightness:55, pickup:25, stiffness:55, decay:90, body:70, bodyTone:40, sympathetic:25, reverb:60, chorus:0, delay:0 },
+        { name:"Singing Bowl", model:"modal", excite:"bow", damping:65, brightness:45, pickup:35, stiffness:40, decay:95, body:75, bodyTone:35, sympathetic:30, reverb:55, chorus:5, delay:0 },
+        { name:"Gong", model:"modal", excite:"strike", damping:55, brightness:40, pickup:30, stiffness:35, decay:92, body:80, bodyTone:30, sympathetic:35, reverb:55, chorus:0, delay:5 },
+        { name:"Wind Chimes", model:"modal", excite:"strike", damping:35, brightness:75, pickup:20, stiffness:45, decay:65, body:30, bodyTone:65, sympathetic:40, reverb:50, chorus:10, delay:15 },
+    ],
+    "Membranes": [
+        { name:"Tabla", model:"membrane", excite:"strike", damping:40, brightness:65, pickup:20, stiffness:30, decay:50, body:55, bodyTone:55, sympathetic:10, reverb:20, chorus:0, delay:0 },
+        { name:"Timpani", model:"membrane", excite:"strike", damping:50, brightness:50, pickup:30, stiffness:20, decay:65, body:75, bodyTone:35, sympathetic:5, reverb:35, chorus:0, delay:0 },
+        { name:"Djembe", model:"membrane", excite:"strike", damping:30, brightness:70, pickup:18, stiffness:10, decay:40, body:60, bodyTone:60, sympathetic:5, reverb:15, chorus:0, delay:0 },
+    ],
+    "Exotic & Ethnic": [
+        { name:"Sitar", model:"string", excite:"pluck", damping:38, brightness:72, pickup:15, stiffness:18, decay:70, body:50, bodyTone:60, sympathetic:50, reverb:25, chorus:0, delay:0 },
+        { name:"Oud", model:"string", excite:"pluck", damping:48, brightness:58, pickup:22, stiffness:8, decay:65, body:60, bodyTone:48, sympathetic:15, reverb:30, chorus:0, delay:0 },
+        { name:"Gamelan", model:"modal", excite:"strike", damping:45, brightness:60, pickup:25, stiffness:50, decay:80, body:65, bodyTone:45, sympathetic:20, reverb:45, chorus:0, delay:8 },
+    ],
+};
+
+let currentModel = 'string';
+let currentExcite = 'pluck';
+let params = {
+    damping:0.50, brightness:0.60, pickup:0.25, stiffness:0.00,
+    decay:0.70, body:0.50, bodytone:0.50, sympathetic:0.00,
+    reverb:0.30, chorus:0.00, delay:0.00, volume:0.75
+};
+
+function updateEffects() {
+    if (!audioCtx) return;
+    reverbGain.gain.setTargetAtTime(params.reverb, audioCtx.currentTime, 0.05);
+    dryGain.gain.setTargetAtTime(1 - params.reverb * 0.5, audioCtx.currentTime, 0.05);
+    delayFeedback.gain.setTargetAtTime(params.delay * 0.6, audioCtx.currentTime, 0.05);
+    masterGain.gain.setTargetAtTime(params.volume, audioCtx.currentTime, 0.05);
+}
+
+function updateModelLabel() {
+    document.getElementById('visModelLabel').textContent =
+        currentModel.charAt(0).toUpperCase() + currentModel.slice(1) + ' · ' + currentExcite;
+}
+
+// --- Voice (same engine as desktop) ---
+function midiToFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+class PhysicalVoice {
+    constructor(freq, vel) {
+        if (!audioCtx) return;
+        this.freq = freq;
+        this.alive = true;
+        this.output = audioCtx.createGain();
+        this.output.gain.value = 0;
+        this.nodes = [];
+        const now = audioCtx.currentTime;
+        switch (currentModel) {
+            case 'string': this.buildString(freq, vel, now); break;
+            case 'tube': this.buildTube(freq, vel, now); break;
+            case 'membrane': this.buildMembrane(freq, vel, now); break;
+            case 'bar': this.buildBar(freq, vel, now); break;
+            case 'modal': this.buildModal(freq, vel, now); break;
+        }
+        this.output.connect(masterGain);
+    }
+
+    buildString(freq, vel, now) {
+        const br = params.brightness, dm = params.damping, st = params.stiffness;
+        const dt = params.decay * 4 + 0.5, pk = params.pickup;
+        if (currentExcite === 'bow') {
+            const saw = audioCtx.createOscillator(); saw.type = 'sawtooth'; saw.frequency.value = freq;
+            const sg = audioCtx.createGain(); sg.gain.value = 0.15 * vel;
+            const lfo = audioCtx.createOscillator(); lfo.frequency.value = 4 + Math.random() * 2;
+            const lg = audioCtx.createGain(); lg.gain.value = freq * 0.003;
+            lfo.connect(lg); lg.connect(saw.frequency);
+            const f = audioCtx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = freq * (2 + br * 6); f.Q.value = 1 + st * 3;
+            saw.connect(sg); sg.connect(f); f.connect(this.output);
+            this.output.gain.setValueAtTime(0, now); this.output.gain.linearRampToValueAtTime(0.8, now + 0.15);
+            saw.start(now); lfo.start(now);
+            this.nodes.push(saw, lfo); this.sustained = true;
+        } else {
+            const nh = Math.min(Math.floor(6 + br * 14), 20);
+            for (let h = 1; h <= nh; h++) {
+                const hf = freq * h * (1 + st * 0.0005 * h * h); if (hf > 18000) break;
+                const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = hf;
+                const g = audioCtx.createGain();
+                const pf = Math.sin(Math.PI * h * pk), df = Math.exp(-h * dm * 0.15);
+                const a = vel * 0.12 / h * df * Math.abs(pf) * (currentExcite === 'strike' ? (h%2===1?1.3:0.7)*1.5 : 1);
+                g.gain.setValueAtTime(a, now);
+                const hd = dt / (1 + h * 0.3 * dm);
+                g.gain.exponentialRampToValueAtTime(0.0001, now + hd);
+                o.connect(g); g.connect(this.output); o.start(now); o.stop(now + hd + 0.1);
+                this.nodes.push(o);
+            }
+            // Noise burst
+            const nd = currentExcite === 'strike' ? 0.008 : 0.015;
+            const bs = Math.ceil(audioCtx.sampleRate * nd);
+            const nb = audioCtx.createBuffer(1, bs, audioCtx.sampleRate);
+            const nbd = nb.getChannelData(0);
+            for (let i = 0; i < bs; i++) nbd[i] = (Math.random()*2-1)*(1-i/bs);
+            const ns = audioCtx.createBufferSource(); ns.buffer = nb;
+            const nfg = audioCtx.createGain(); nfg.gain.value = vel * 0.3;
+            ns.connect(nfg); nfg.connect(this.output); ns.start(now);
+            this.nodes.push(ns);
+            this.output.gain.setValueAtTime(1, now);
+            this.output.gain.exponentialRampToValueAtTime(0.0001, now + dt);
+            this.stopTime = now + dt; this.sustained = false;
+        }
+        if (params.sympathetic > 0.05) {
+            [freq*2, freq*1.5, freq*3].forEach(sf => {
+                if (sf > 12000) return;
+                const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = sf;
+                const g = audioCtx.createGain();
+                g.gain.setValueAtTime(0, now);
+                g.gain.linearRampToValueAtTime(params.sympathetic*0.03*vel, now+0.3);
+                g.gain.exponentialRampToValueAtTime(0.0001, now+params.decay*4);
+                o.connect(g); g.connect(this.output); o.start(now); o.stop(now+params.decay*4+0.1);
+                this.nodes.push(o);
+            });
+        }
+    }
+
+    buildTube(freq, vel, now) {
+        const br = params.brightness, dm = params.damping, dt = params.decay * 5 + 1;
+        const open = br > 0.5; this.sustained = currentExcite === 'blow';
+        const nh = Math.floor(4 + br * 12);
+        for (let h = 1; h <= nh; h++) {
+            const hn = open ? h : (h*2-1); const hf = freq * hn; if (hf > 16000) break;
+            const o = audioCtx.createOscillator(); o.type = 'sine'; o.frequency.value = hf;
+            const g = audioCtx.createGain();
+            const a = vel * 0.15 / hn * Math.exp(-hn * dm * 0.08);
+            if (this.sustained) {
+                g.gain.setValueAtTime(0, now); g.gain.linearRampToValueAtTime(a, now + 0.1 + h*0.02);
+                const bl = audioCtx.createOscillator(); bl.frequency.value = 3+Math.random()*3;
+                const bd = audioCtx.createGain(); bd.gain.value = a*0.15;
+                bl.connect(bd); bd.connect(g.gain); bl.start(now); this.nodes.push(bl);
+            } else {
+                g.gain.setValueAtTime(a, now); g.gain.exponentialRampToValueAtTime(0.0001, now + dt/hn);
+            }
+            o.connect(g); g.connect(this.output); o.start(now);
+            if (!this.sustained) o.stop(now + dt + 0.1);
+            this.nodes.push(o);
+        }
+        if (currentExcite === 'blow') {
+            const nl = audioCtx.sampleRate*4;
+            const nb = audioCtx.createBuffer(1, nl, audioCtx.sampleRate);
+            const nd = nb.getChannelData(0); for (let i=0;i<nl;i++) nd[i]=Math.random()*2-1;
+            const ns = audioCtx.createBufferSource(); ns.buffer = nb; ns.loop = true;
+            const nf = audioCtx.createBiquadFilter(); nf.type='bandpass'; nf.frequency.value=freq*3; nf.Q.value=2;
+            const ng = audioCtx.createGain(); ng.gain.value = vel*0.04*(1-dm*0.5);
+            ns.connect(nf); nf.connect(ng); ng.connect(this.output); ns.start(now); this.nodes.push(ns);
+        }
+        this.output.gain.setValueAtTime(0, now);
+        this.output.gain.linearRampToValueAtTime(0.8, now+(this.sustained?0.12:0.005));
+        if (!this.sustained) {
+            this.output.gain.exponentialRampToValueAtTime(0.0001, now+dt); this.stopTime=now+dt;
+        }
+    }
+
+    buildMembrane(freq, vel, now) {
+        const mr = [1,1.593,2.136,2.296,2.653,2.917,3.156,3.501,3.6,3.652];
+        const dm = params.damping, br = params.brightness, st = params.stiffness, dt = params.decay*3+0.3;
+        this.sustained = false;
+        mr.forEach((r, i) => {
+            const mf = freq*r*(1+st*0.01*i); if (mf>16000) return;
+            const o = audioCtx.createOscillator(); o.type='sine'; o.frequency.value=mf;
+            const g = audioCtx.createGain();
+            const a = vel*0.1*Math.exp(-i*(0.2+dm*0.3))*(0.5+br*0.5);
+            g.gain.setValueAtTime(a, now);
+            const md = dt/(1+i*0.4); g.gain.exponentialRampToValueAtTime(0.0001, now+md);
+            o.connect(g); g.connect(this.output); o.start(now); o.stop(now+md+0.1); this.nodes.push(o);
+        });
+        const bs = Math.ceil(audioCtx.sampleRate*0.01);
+        const b = audioCtx.createBuffer(1, bs, audioCtx.sampleRate);
+        const d = b.getChannelData(0); for(let i=0;i<bs;i++) d[i]=(Math.random()*2-1)*(1-i/bs);
+        const s = audioCtx.createBufferSource(); s.buffer=b;
+        const sg = audioCtx.createGain(); sg.gain.value=vel*0.4;
+        s.connect(sg); sg.connect(this.output); s.start(now); this.nodes.push(s);
+        this.output.gain.setValueAtTime(1,now);
+        this.output.gain.exponentialRampToValueAtTime(0.0001,now+dt); this.stopTime=now+dt;
+    }
+
+    buildBar(freq, vel, now) {
+        const br = [1,2.758,5.406,8.934,13.345,18.636];
+        const dm = params.damping, bri = params.brightness, st = params.stiffness, dt = params.decay*4+0.5;
+        this.sustained = false;
+        br.forEach((r, i) => {
+            const pf = freq*r*(1+st*0.005*i); if (pf>18000) return;
+            const o = audioCtx.createOscillator(); o.type='sine'; o.frequency.value=pf;
+            const g = audioCtx.createGain();
+            const a = vel*0.12*Math.exp(-i*(0.15+dm*0.25));
+            g.gain.setValueAtTime(a, now);
+            const pd = dt/(1+i*0.2); g.gain.exponentialRampToValueAtTime(0.0001,now+pd);
+            o.connect(g); g.connect(this.output); o.start(now); o.stop(now+pd+0.1); this.nodes.push(o);
+        });
+        const bs = Math.ceil(audioCtx.sampleRate*0.006);
+        const b = audioCtx.createBuffer(1,bs,audioCtx.sampleRate);
+        const d = b.getChannelData(0); for(let i=0;i<bs;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/bs,2);
+        const s = audioCtx.createBufferSource(); s.buffer=b;
+        const nf = audioCtx.createBiquadFilter(); nf.type='highpass'; nf.frequency.value=freq*(1+bri*3);
+        const sg = audioCtx.createGain(); sg.gain.value=vel*0.25;
+        s.connect(nf); nf.connect(sg); sg.connect(this.output); s.start(now); this.nodes.push(s);
+        this.output.gain.setValueAtTime(1,now);
+        this.output.gain.exponentialRampToValueAtTime(0.0001,now+dt); this.stopTime=now+dt;
+    }
+
+    buildModal(freq, vel, now) {
+        const mr = [1,2,3,4.2,5.4,6.8,8.1,9.7,11.5,13.2,15.1,17.3];
+        const dm = params.damping, br = params.brightness, st = params.stiffness, dt = params.decay*6+1;
+        const bowed = currentExcite === 'bow'; this.sustained = bowed;
+        mr.forEach((r, i) => {
+            const pf = freq*r*(1+st*0.003*i*i); if(pf>18000) return;
+            const o = audioCtx.createOscillator(); o.type='sine'; o.frequency.value=pf;
+            const g = audioCtx.createGain();
+            const a = vel*0.08*Math.exp(-i*(0.1+dm*0.2))*(0.3+br*0.7);
+            if (bowed) { g.gain.setValueAtTime(0,now); g.gain.linearRampToValueAtTime(a*0.7,now+0.2); }
+            else { g.gain.setValueAtTime(a,now); g.gain.exponentialRampToValueAtTime(0.0001,now+dt/(1+i*0.15)); }
+            o.connect(g); g.connect(this.output); o.start(now);
+            if(!bowed) o.stop(now+dt+0.5); this.nodes.push(o);
+        });
+        if (!bowed) {
+            const bs=Math.ceil(audioCtx.sampleRate*0.004);
+            const b=audioCtx.createBuffer(1,bs,audioCtx.sampleRate);
+            const d=b.getChannelData(0); for(let i=0;i<bs;i++) d[i]=(Math.random()*2-1)*(1-i/bs);
+            const s=audioCtx.createBufferSource(); s.buffer=b;
+            const sg=audioCtx.createGain(); sg.gain.value=vel*0.2;
+            s.connect(sg); sg.connect(this.output); s.start(now); this.nodes.push(s);
+        }
+        this.output.gain.setValueAtTime(bowed?0:1,now);
+        if(bowed) this.output.gain.linearRampToValueAtTime(0.8,now+0.15);
+        else { this.output.gain.exponentialRampToValueAtTime(0.0001,now+dt); this.stopTime=now+dt; }
+    }
+
+    release() {
+        if (!audioCtx || !this.alive) return;
+        this.alive = false;
+        const now = audioCtx.currentTime;
+        if (this.sustained) {
+            this.output.gain.cancelScheduledValues(now);
+            this.output.gain.setValueAtTime(this.output.gain.value, now);
+            this.output.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+            setTimeout(() => this.cleanup(), 400);
+        } else setTimeout(() => this.cleanup(), 100);
+    }
+
+    cleanup() {
+        try {
+            this.nodes.forEach(n => { try{n.stop();}catch(e){} try{n.disconnect();}catch(e){} });
+            this.output.disconnect();
+        } catch(e) {}
+    }
+}
+
+function playNote(midi, vel) {
+    initAudio();
+    if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
+    activeVoices.set(midi, new PhysicalVoice(midiToFreq(midi), vel || 0.8));
+}
+
+function stopNote(midi) {
+    if (sustainActive) return;
+    if (activeVoices.has(midi)) { activeVoices.get(midi).release(); activeVoices.delete(midi); }
+}
+
+// --- Pads ---
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+function buildPads() {
+    const container = document.getElementById('padsContainer');
+    container.innerHTML = '';
+    const baseNote = currentOctave * 12 + 12; // MIDI note for C of current octave
+    const blackKeys = [1,3,6,8,10];
+
+    for (let i = 0; i < 16; i++) {
+        const midi = baseNote + i;
+        const noteInOctave = midi % 12;
+        const noteName = NOTE_NAMES[noteInOctave];
+        const octave = Math.floor(midi / 12) - 1;
+        const isBlack = blackKeys.includes(noteInOctave);
+
+        const pad = document.createElement('div');
+        pad.className = 'pad' + (isBlack ? ' black-key' : '');
+        pad.innerHTML = `<span class="pad-note">${noteName}</span><span class="pad-oct">${octave}</span>`;
+        pad.dataset.midi = midi;
+
+        pad.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            playNote(midi, 0.8);
+            pad.classList.add('pressed');
+        }, { passive: false });
+        pad.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            stopNote(midi);
+            pad.classList.remove('pressed');
+        }, { passive: false });
+        pad.addEventListener('touchcancel', () => {
+            stopNote(midi);
+            pad.classList.remove('pressed');
+        });
+        // Mouse fallback
+        pad.addEventListener('mousedown', (e) => { e.preventDefault(); playNote(midi, 0.8); pad.classList.add('pressed'); });
+        pad.addEventListener('mouseup', () => { stopNote(midi); pad.classList.remove('pressed'); });
+        pad.addEventListener('mouseleave', () => { stopNote(midi); pad.classList.remove('pressed'); });
+
+        container.appendChild(pad);
+    }
+
+    document.getElementById('octLabel').textContent = 'Octave ' + currentOctave;
+}
+
+// --- Build UI ---
+function buildPresets() {
+    const list = document.getElementById('presetList');
+    list.innerHTML = '';
+    for (const [cat, presets] of Object.entries(PRESETS)) {
+        const div = document.createElement('div');
+        div.className = 'preset-category';
+        div.innerHTML = `<div class="preset-cat-title">${cat}</div>`;
+        const grid = document.createElement('div');
+        grid.className = 'preset-grid';
+        presets.forEach(p => {
+            const btn = document.createElement('button');
+            btn.className = 'preset-btn';
+            btn.textContent = p.name;
+            btn.onclick = () => loadPreset(p, btn);
+            grid.appendChild(btn);
+        });
+        div.appendChild(grid);
+        list.appendChild(div);
+    }
+}
+
+function loadPreset(p, btn) {
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    currentModel = p.model;
+    currentExcite = p.excite;
+    document.querySelectorAll('[data-model]').forEach(b => b.classList.toggle('active', b.dataset.model === p.model));
+    document.querySelectorAll('[data-excite]').forEach(b => b.classList.toggle('active', b.dataset.excite === p.excite));
+
+    const map = { damping:p.damping, brightness:p.brightness, pickup:p.pickup, stiffness:p.stiffness,
+                  decay:p.decay, body:p.body, bodytone:p.bodyTone, sympathetic:p.sympathetic,
+                  reverb:p.reverb, chorus:p.chorus, delay:p.delay };
+    for (const [k, v] of Object.entries(map)) {
+        params[k] = v / 100;
+        const sl = document.getElementById('sl_' + k);
+        const vl = document.getElementById('vl_' + k);
+        if (sl) sl.value = v;
+        if (vl) vl.textContent = (v/100).toFixed(2);
+    }
+    updateEffects();
+    updateModelLabel();
+}
+
+function buildControls() {
+    // Model buttons
+    const mr = document.getElementById('modelRow');
+    ['string','tube','membrane','bar','modal'].forEach(m => {
+        const b = document.createElement('button');
+        b.className = 'sel-btn' + (m === currentModel ? ' active' : '');
+        b.textContent = m.charAt(0).toUpperCase() + m.slice(1);
+        b.dataset.model = m;
+        b.onclick = () => {
+            document.querySelectorAll('[data-model]').forEach(x => x.classList.remove('active'));
+            document.querySelectorAll(`[data-model="${m}"]`).forEach(x => x.classList.add('active'));
+            currentModel = m;
+            updateModelLabel();
+        };
+        mr.appendChild(b);
+    });
+
+    // Excitation buttons
+    const er = document.getElementById('exciteRow');
+    ['pluck','strike','bow','blow','noise','impulse'].forEach(e => {
+        const b = document.createElement('button');
+        b.className = 'sel-btn' + (e === currentExcite ? ' active' : '');
+        b.textContent = e.charAt(0).toUpperCase() + e.slice(1);
+        b.dataset.excite = e;
+        b.onclick = () => {
+            document.querySelectorAll('[data-excite]').forEach(x => x.classList.remove('active'));
+            document.querySelectorAll(`[data-excite="${e}"]`).forEach(x => x.classList.add('active'));
+            currentExcite = e;
+            updateModelLabel();
+        };
+        er.appendChild(b);
+    });
+
+    // Sliders
+    function makeSlider(container, label, key, val) {
+        const div = document.createElement('div');
+        div.className = 'slider-group';
+        div.innerHTML = `
+            <div class="slider-label"><span class="slider-name">${label}</span><span class="slider-value" id="vl_${key}">${(val/100).toFixed(2)}</span></div>
+            <input type="range" id="sl_${key}" min="0" max="100" value="${val}">
+        `;
+        container.appendChild(div);
+        div.querySelector('input').addEventListener('input', function() {
+            const n = this.value / 100;
+            document.getElementById('vl_'+key).textContent = n.toFixed(2);
+            params[key] = n;
+            updateEffects();
+        });
+    }
+
+    const ms = document.getElementById('mainSliders');
+    makeSlider(ms, 'Damping', 'damping', 50);
+    makeSlider(ms, 'Brightness', 'brightness', 60);
+    makeSlider(ms, 'Pickup Position', 'pickup', 25);
+    makeSlider(ms, 'Stiffness', 'stiffness', 0);
+    makeSlider(ms, 'Decay Time', 'decay', 70);
+
+    const bs = document.getElementById('bodySliders');
+    makeSlider(bs, 'Body Size', 'body', 50);
+    makeSlider(bs, 'Body Tone', 'bodytone', 50);
+    makeSlider(bs, 'Sympathetic', 'sympathetic', 0);
+
+    const fx = document.getElementById('fxSliders');
+    makeSlider(fx, 'Reverb', 'reverb', 30);
+    makeSlider(fx, 'Chorus', 'chorus', 0);
+    makeSlider(fx, 'Delay', 'delay', 0);
+
+    const ma = document.getElementById('masterSliders');
+    makeSlider(ma, 'Volume', 'volume', 75);
+}
+
+// --- Tabs ---
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.onclick = () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add('active');
+    };
+});
+
+// --- Octave controls ---
+document.getElementById('octDown').onclick = () => { if (currentOctave > 1) { currentOctave--; buildPads(); } };
+document.getElementById('octUp').onclick = () => { if (currentOctave < 7) { currentOctave++; buildPads(); } };
+
+// --- Sustain ---
+document.getElementById('btnSustain').onclick = function() {
+    sustainActive = !sustainActive;
+    this.classList.toggle('active', sustainActive);
+    if (!sustainActive) {
+        activeVoices.forEach((v, k) => { v.release(); });
+        activeVoices.clear();
+    }
+};
+
+// --- Visualisation ---
+function initVis() {
+    const canvas = document.getElementById('visCanvas');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    function resize() {
+        const r = canvas.parentElement.getBoundingClientRect();
+        canvas.width = r.width * dpr; canvas.height = r.height * dpr;
+        ctx.scale(dpr, dpr);
+    }
+    resize();
+    window.addEventListener('resize', () => { ctx.setTransform(1,0,0,1,0,0); resize(); });
+
+    function draw() {
+        const w = canvas.width / dpr, h = canvas.height / dpr;
+        ctx.fillStyle = '#080604';
+        ctx.fillRect(0, 0, w, h);
+        if (analyser) {
+            analyser.getFloatTimeDomainData(analyserData);
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(212,135,14,0.6)';
+            ctx.lineWidth = 1.5;
+            const sw = w / analyserData.length;
+            for (let i = 0; i < analyserData.length; i++) {
+                const x = i * sw, y = h/2 + analyserData[i] * h * 0.4;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(232,168,73,0.15)';
+            ctx.lineWidth = 4;
+            for (let i = 0; i < analyserData.length; i++) {
+                const x = i * sw, y = h/2 + analyserData[i] * h * 0.4;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(212,135,14,0.06)';
+        ctx.setLineDash([3,6]);
+        ctx.moveTo(0, canvas.height/dpr/2);
+        ctx.lineTo(canvas.width/dpr, canvas.height/dpr/2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        requestAnimationFrame(draw);
+    }
+    draw();
+}
+
+// --- Init ---
+buildPads();
+buildPresets();
+buildControls();
+initVis();
+
+// Load first preset
+const firstBtn = document.querySelector('.preset-btn');
+if (firstBtn) {
+    const firstPreset = Object.values(PRESETS)[0][0];
+    loadPreset(firstPreset, firstBtn);
+}
+</script>
+</body>
+</html>
